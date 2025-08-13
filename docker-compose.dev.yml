@@ -1,0 +1,158 @@
+# Docker Compose - Development Configuration
+# Nox API v7.0.0 development environment with hot reload
+
+version: '3.8'
+
+services:
+  # ===== NOX API DEVELOPMENT =====
+  nox-api-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    image: nox-api:v7.0.0-dev
+    container_name: nox-api-dev
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+      - "5678:5678"  # Debug port
+    environment:
+      # Database configuration
+      - DATABASE_URL=postgresql://noxuser:dev_password_123@postgres-dev:5432/noxdb_dev
+      
+      # OAuth2 configuration (development)
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-dev-google-client-id}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-dev-google-secret}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-dev-github-client-id}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-dev-github-secret}
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-dev-microsoft-client-id}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-dev-microsoft-secret}
+      
+      # JWT configuration
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-not-for-production}
+      
+      # API configuration
+      - API_HOST=0.0.0.0
+      - API_PORT=8082
+      - ENVIRONMENT=development
+      - DEBUG=true
+      
+      # Redis configuration
+      - REDIS_URL=redis://redis-dev:6379/0
+      
+    depends_on:
+      postgres-dev:
+        condition: service_healthy
+      redis-dev:
+        condition: service_healthy
+    networks:
+      - nox-dev-network
+    volumes:
+      - .:/app  # Mount source code for hot reload
+      - dev_logs:/app/logs
+    command: ["uvicorn", "nox_api_v7_fixed:app", "--host", "0.0.0.0", "--port", "8082", "--reload"]
+
+  # ===== POSTGRESQL DEVELOPMENT =====
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: nox-postgres-dev
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=noxdb_dev
+      - POSTGRES_USER=noxuser
+      - POSTGRES_PASSWORD=dev_password_123
+      - POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+      - ./database/dev-data:/docker-entrypoint-initdb.d/dev-data
+    networks:
+      - nox-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U noxuser -d noxdb_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===== REDIS DEVELOPMENT =====
+  redis-dev:
+    image: redis:7-alpine
+    container_name: nox-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    volumes:
+      - redis_dev_data:/data
+    networks:
+      - nox-dev-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ===== DEVELOPMENT MONITORING =====
+  prometheus-dev:
+    image: prom/prometheus:latest
+    container_name: nox-prometheus-dev
+    restart: unless-stopped
+    ports:
+      - "9091:9090"  # Different port to avoid conflicts
+    volumes:
+      - ./config/prometheus-dev.yml:/etc/prometheus/prometheus.yml
+      - prometheus_dev_data:/prometheus
+    networks:
+      - nox-dev-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--storage.tsdb.retention.time=7d'
+
+  # ===== DEVELOPMENT TOOLS =====
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: nox-mailhog-dev
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - nox-dev-network
+
+  # ===== ADMINER (Database Management) =====
+  adminer:
+    image: adminer:latest
+    container_name: nox-adminer-dev
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    networks:
+      - nox-dev-network
+    depends_on:
+      - postgres-dev
+
+# ===== DEVELOPMENT NETWORKS =====
+networks:
+  nox-dev-network:
+    driver: bridge
+    name: nox-dev-network
+
+# ===== DEVELOPMENT VOLUMES =====
+volumes:
+  postgres_dev_data:
+    driver: local
+    name: nox-postgres-dev-data
+  redis_dev_data:
+    driver: local
+    name: nox-redis-dev-data
+  prometheus_dev_data:
+    driver: local
+    name: nox-prometheus-dev-data
+  dev_logs:
+    driver: local
+    name: nox-dev-logs

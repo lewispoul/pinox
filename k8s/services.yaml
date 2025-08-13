@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nox-api-service
+  namespace: nox-api
+  labels:
+    app: nox-api
+    component: api
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8082"
+    prometheus.io/path: "/api/v7/metrics/prometheus"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8082
+    protocol: TCP
+    name: http
+  selector:
+    app: nox-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nox-api-headless
+  namespace: nox-api
+  labels:
+    app: nox-api
+    component: api
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 8082
+    targetPort: 8082
+    protocol: TCP
+    name: http
+  selector:
+    app: nox-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nox-api-nodeport
+  namespace: nox-api
+  labels:
+    app: nox-api
+    component: api
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 8082
+    protocol: TCP
+    name: http
+    nodePort: 30082
+  selector:
+    app: nox-api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nox-api-loadbalancer
+  namespace: nox-api
+  labels:
+    app: nox-api
+    component: api
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8082
+    protocol: TCP
+    name: http
+  - port: 443
+    targetPort: 8082
+    protocol: TCP
+    name: https
+  selector:
+    app: nox-api

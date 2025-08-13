@@ -1,0 +1,205 @@
+# Redis Cluster Configuration for Nox API v8.0.0
+version: '3.8'
+
+services:
+  # Redis Cluster Nodes
+  redis-node1:
+    image: redis:7-alpine
+    container_name: nox-redis-node1
+    restart: unless-stopped
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file nodes-6379.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7001:6379"
+      - "17001:16379"  # Cluster bus port
+    volumes:
+      - redis_node1_data:/data
+      - redis_node1_conf:/etc/redis
+    networks:
+      - nox-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  redis-node2:
+    image: redis:7-alpine
+    container_name: nox-redis-node2
+    restart: unless-stopped
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file nodes-6379.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7002:6379"
+      - "17002:16379"
+    volumes:
+      - redis_node2_data:/data
+      - redis_node2_conf:/etc/redis
+    networks:
+      - nox-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  redis-node3:
+    image: redis:7-alpine
+    container_name: nox-redis-node3
+    restart: unless-stopped
+    command: >
+      redis-server
+      --cluster-enabled yes
+      --cluster-config-file nodes-6379.conf
+      --cluster-node-timeout 5000
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "7003:6379"
+      - "17003:16379"
+    volumes:
+      - redis_node3_data:/data
+      - redis_node3_conf:/etc/redis
+    networks:
+      - nox-cluster-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Redis Cluster Initialization
+  redis-cluster-init:
+    image: redis:7-alpine
+    container_name: nox-redis-cluster-init
+    depends_on:
+      - redis-node1
+      - redis-node2
+      - redis-node3
+    networks:
+      - nox-cluster-network
+    command: >
+      sh -c "
+      echo 'Waiting for Redis nodes to be ready...' &&
+      sleep 10 &&
+      redis-cli --cluster create
+      redis-node1:6379
+      redis-node2:6379
+      redis-node3:6379
+      --cluster-replicas 0 --cluster-yes &&
+      echo 'Redis cluster initialized successfully!' &&
+      redis-cli -h redis-node1 cluster info &&
+      redis-cli -h redis-node1 cluster nodes
+      "
+    restart: "no"
+
+  # Redis Sentinel for High Availability (Optional)
+  redis-sentinel1:
+    image: redis:7-alpine
+    container_name: nox-redis-sentinel1
+    restart: unless-stopped
+    ports:
+      - "26379:26379"
+    volumes:
+      - ./config/sentinel1.conf:/etc/redis/sentinel.conf
+    networks:
+      - nox-cluster-network
+    command: redis-sentinel /etc/redis/sentinel.conf
+    depends_on:
+      - redis-node1
+      - redis-node2
+      - redis-node3
+
+  redis-sentinel2:
+    image: redis:7-alpine
+    container_name: nox-redis-sentinel2
+    restart: unless-stopped
+    ports:
+      - "26380:26379"
+    volumes:
+      - ./config/sentinel2.conf:/etc/redis/sentinel.conf
+    networks:
+      - nox-cluster-network
+    command: redis-sentinel /etc/redis/sentinel.conf
+    depends_on:
+      - redis-node1
+      - redis-node2
+      - redis-node3
+
+  redis-sentinel3:
+    image: redis:7-alpine
+    container_name: nox-redis-sentinel3
+    restart: unless-stopped
+    ports:
+      - "26381:26379"
+    volumes:
+      - ./config/sentinel3.conf:/etc/redis/sentinel.conf
+    networks:
+      - nox-cluster-network
+    command: redis-sentinel /etc/redis/sentinel.conf
+    depends_on:
+      - redis-node1
+      - redis-node2
+      - redis-node3
+
+  # Redis Cluster Management Tool
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: nox-redis-commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=node1:redis-node1:6379,node2:redis-node2:6379,node3:redis-node3:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=nox-redis-admin
+    ports:
+      - "8081:8081"
+    networks:
+      - nox-cluster-network
+    depends_on:
+      - redis-node1
+      - redis-node2
+      - redis-node3
+
+volumes:
+  redis_node1_data:
+    name: nox-redis-node1-data
+  redis_node1_conf:
+    name: nox-redis-node1-conf
+  redis_node2_data:
+    name: nox-redis-node2-data
+  redis_node2_conf:
+    name: nox-redis-node2-conf
+  redis_node3_data:
+    name: nox-redis-node3-data
+  redis_node3_conf:
+    name: nox-redis-node3-conf
+
+networks:
+  nox-cluster-network:
+    name: nox-cluster-network
+    external: true

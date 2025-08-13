@@ -1,0 +1,330 @@
+# Nox API v7.0.0 - Continuous Integration Pipeline
+# Automated testing, building, and validation
+
+name: CI - Continuous Integration
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/nox-api
+
+jobs:
+  # ===== CODE QUALITY & TESTING =====
+  test:
+    name: Run Tests & Code Quality
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: noxdb_test
+          POSTGRES_USER: noxuser
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov black isort flake8 safety bandit
+
+    - name: Code Formatting Check (Black)
+      run: black --check --diff .
+
+    - name: Import Sorting Check (isort)
+      run: isort --check-only --diff .
+
+    - name: Linting (flake8)
+      run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+    - name: Security Check (Bandit)
+      run: bandit -r . -f json -o bandit-report.json || true
+
+    - name: Dependency Security Check (Safety)
+      run: safety check --json --output safety-report.json || true
+
+    - name: Run Unit Tests
+      env:
+        DATABASE_URL: postgresql://noxuser:test_password@localhost:5432/noxdb_test
+        JWT_SECRET: test-jwt-secret-for-ci
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        pytest tests/ -v --cov=. --cov-report=xml --cov-report=html
+
+    - name: Upload Coverage Reports
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+    - name: Upload Test Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: |
+          htmlcov/
+          bandit-report.json
+          safety-report.json
+
+  # ===== DOCKER BUILD & SECURITY SCAN =====
+  build:
+    name: Build & Scan Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build Production Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: false
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Build Development Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.dev
+        platforms: linux/amd64,linux/arm64
+        push: false
+        tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:dev
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run Container Security Scan (Trivy)
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy Scan Results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # ===== INTEGRATION TESTS =====
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Create .env for Testing
+      run: |
+        cat > .env << EOF
+        POSTGRES_PASSWORD=test_integration_password
+        JWT_SECRET=test-integration-jwt-secret
+        REDIS_PASSWORD=test_redis_password
+        GOOGLE_CLIENT_ID=test-google-client-id
+        GOOGLE_CLIENT_SECRET=test-google-secret
+        GITHUB_CLIENT_ID=test-github-client-id
+        GITHUB_CLIENT_SECRET=test-github-secret
+        MICROSOFT_CLIENT_ID=test-microsoft-client-id
+        MICROSOFT_CLIENT_SECRET=test-microsoft-secret
+        GRAFANA_ADMIN_PASSWORD=test_grafana_password
+        EOF
+
+    - name: Start Docker Compose Services
+      run: |
+        docker-compose -f docker-compose.yml up -d postgres redis
+        sleep 10
+
+    - name: Wait for Services Health Check
+      run: |
+        timeout 60 bash -c 'until docker-compose -f docker-compose.yml exec -T postgres pg_isready -U noxuser -d noxdb; do sleep 2; done'
+
+    - name: Run Integration Tests
+      run: |
+        docker run --rm \
+          --network nox-network \
+          -e DATABASE_URL=postgresql://noxuser:test_integration_password@nox-postgres-prod:5432/noxdb \
+          -e JWT_SECRET=test-integration-jwt-secret \
+          -e REDIS_URL=redis://nox-redis-prod:6379/0 \
+          nox-api:v7.0.0 \
+          pytest tests/integration/ -v
+
+    - name: API Health Check
+      run: |
+        docker-compose -f docker-compose.yml up -d nox-api
+        sleep 20
+        curl -f http://localhost:8082/api/v7/auth/health || exit 1
+
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose -f docker-compose.yml down -v
+
+  # ===== PERFORMANCE TESTS =====
+  performance:
+    name: Performance & Load Testing
+    runs-on: ubuntu-latest
+    needs: integration
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup K6 Load Testing
+      uses: grafana/setup-k6-action@v1
+
+    - name: Create .env for Performance Testing
+      run: |
+        cat > .env << EOF
+        POSTGRES_PASSWORD=perf_test_password
+        JWT_SECRET=performance-test-jwt-secret
+        REDIS_PASSWORD=perf_redis_password
+        GOOGLE_CLIENT_ID=perf-google-client-id
+        GOOGLE_CLIENT_SECRET=perf-google-secret
+        GITHUB_CLIENT_ID=perf-github-client-id
+        GITHUB_CLIENT_SECRET=perf-github-secret
+        MICROSOFT_CLIENT_ID=perf-microsoft-client-id
+        MICROSOFT_CLIENT_SECRET=perf-microsoft-secret
+        GRAFANA_ADMIN_PASSWORD=perf_grafana_password
+        EOF
+
+    - name: Start Services for Performance Testing
+      run: |
+        docker-compose -f docker-compose.yml up -d
+        sleep 30
+
+    - name: Run Performance Tests
+      run: |
+        k6 run --out json=k6-results.json tests/performance/load-test.js
+
+    - name: Upload Performance Results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: k6-results.json
+
+    - name: Cleanup
+      if: always()
+      run: |
+        docker-compose -f docker-compose.yml down -v
+
+  # ===== PUSH TO REGISTRY (on main branch) =====
+  push:
+    name: Push to Container Registry
+    runs-on: ubuntu-latest
+    needs: [test, build, integration]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract Metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest
+          type=raw,value=v7.0.0
+
+    - name: Build and Push Production Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Generate SBOM
+      uses: anchore/sbom-action@v0
+      with:
+        image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        format: spdx-json
+        output-file: sbom.spdx.json
+
+    - name: Upload SBOM
+      uses: actions/upload-artifact@v3
+      with:
+        name: sbom
+        path: sbom.spdx.json

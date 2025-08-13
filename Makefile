@@ -1,7 +1,7 @@
 # Makefile for Nox API - Simple automation
-# Conforme à COPILOT_PLAN.md - Étape 2
+# Conforme à COPILOT_PLAN.md - Étapes 2, 4, 5
 
-.PHONY: help install repair validate test clean
+.PHONY: help install harden caddy-lan caddy-public nginx-public repair repair-v2 validate test demo logs install-logs debug clean
 
 # Configuration
 SCRIPT_DIR = nox-api/scripts
@@ -14,10 +14,17 @@ help:  ## Afficher cette aide
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 	@echo ""
 	@echo "Exemples:"
-	@echo "  make install    # Installation complète"
-	@echo "  make repair     # Réparation/maintenance"
-	@echo "  make validate   # Validation système"
-	@echo "  make test       # Tests API"
+	@echo "  make install       # Installation complète"
+	@echo "  make harden        # Durcissement sécurisé"
+	@echo "  make caddy-lan     # Reverse proxy Caddy (LAN)"
+	@echo "  make caddy-public DOMAIN=api.example.com EMAIL=admin@example.com"
+	@echo "  make nginx-public DOMAIN=api.example.com EMAIL=admin@example.com"
+	@echo "  make repair        # Réparation/maintenance"
+	@echo "  make demo          # Tests automatiques avec client Python"
+	@echo "  make logs          # Afficher les logs récents"
+	@echo "  make install-logs  # Installer système de logs et rotation (Étape 6)"
+	@echo "  make debug         # Diagnostic rapide avec nox-debug"
+	@echo "  make test          # Tests API"
 
 install:  ## Installer/réinstaller Nox API
 	@echo "Installation de Nox API..."
@@ -26,6 +33,26 @@ install:  ## Installer/réinstaller Nox API
 harden:  ## Durcissement sécurisé (Étape 3) - Migration venv vers /opt/nox
 	@echo "Durcissement de Nox API..."
 	@sudo ./$(DEPLOY_DIR)/harden_nox.sh
+
+caddy-lan:  ## Installer Caddy en mode LAN (HTTP port 80)
+	@echo "Configuration Caddy mode LAN..."
+	@sudo ./$(DEPLOY_DIR)/caddy_setup.sh lan
+
+caddy-public:  ## Installer Caddy en mode PUBLIC avec HTTPS - Usage: make caddy-public DOMAIN=example.com EMAIL=admin@example.com
+	@echo "Configuration Caddy mode PUBLIC..."
+	@if [ -z "$(DOMAIN)" ] || [ -z "$(EMAIL)" ]; then \
+		echo "Usage: make caddy-public DOMAIN=votre-domaine.tld EMAIL=votre-email@example.com"; \
+		exit 1; \
+	fi
+	@sudo ./$(DEPLOY_DIR)/caddy_setup.sh public $(DOMAIN) $(EMAIL)
+
+nginx-public:  ## Installer Nginx en mode PUBLIC avec HTTPS - Usage: make nginx-public DOMAIN=example.com EMAIL=admin@example.com
+	@echo "Configuration Nginx mode PUBLIC..."
+	@if [ -z "$(DOMAIN)" ] || [ -z "$(EMAIL)" ]; then \
+		echo "Usage: make nginx-public DOMAIN=votre-domaine.tld EMAIL=votre-email@example.com"; \
+		exit 1; \
+	fi
+	@sudo ./$(DEPLOY_DIR)/nginx_setup.sh $(DOMAIN) $(EMAIL)
 
 repair:  ## Réparer et maintenir l'installation Nox API
 	@echo "Réparation de Nox API..."
@@ -38,6 +65,46 @@ repair-v2:  ## Réparer avec script robuste (sans hang)
 validate:  ## Valider l'installation actuelle
 	@echo "Validation de Nox API..."
 	@./validate_nox.sh
+
+demo:  ## Exécuter les tests automatiques avec le client Python (Étape 5)
+	@echo "Lancement des tests demo avec client Python..."
+	@if [ -f "/etc/default/nox-api" ]; then \
+		export NOX_API_TOKEN=$$(sudo grep "^NOX_API_TOKEN=" /etc/default/nox-api | cut -d= -f2 | tr -d '"'); \
+		export NOX_API_URL="http://localhost"; \
+		echo "🚀 Configuration détectée:"; \
+		echo "   API URL: $$NOX_API_URL"; \
+		echo "   Token: $$(echo $$NOX_API_TOKEN | cut -c1-8)..."; \
+		echo ""; \
+		cd clients && python3 tests_demo.py; \
+	else \
+		echo "❌ Erreur: Configuration /etc/default/nox-api non trouvée."; \
+		echo "💡 Exécutez 'make install' d'abord pour installer Nox API."; \
+		exit 1; \
+	fi
+
+logs:  ## Afficher les logs récents du service
+	@echo "=== Logs Nox API ==="
+	@if [ -d "/var/log/nox-api" ]; then \
+		echo "Logs dédiés disponibles:"; \
+		sudo tail -20 /var/log/nox-api/nox-api.log 2>/dev/null || echo "Pas de logs applicatifs"; \
+	else \
+		echo "Logs systemd (pas de logs dédiés):"; \
+		sudo journalctl -u nox-api -n 30 --no-pager 2>/dev/null || echo "Service non installé"; \
+	fi
+
+install-logs:  ## Installer le système de logs dédiés et rotation (Étape 6)
+	@echo "Installation du système de logs et rotation..."
+	@sudo ./$(DEPLOY_DIR)/install_logging.sh
+
+debug:  ## Diagnostic rapide du système Nox API
+	@echo "Diagnostic Nox API..."
+	@if command -v nox-debug >/dev/null 2>&1; then \
+		nox-debug; \
+	else \
+		echo "❌ Outil nox-debug non installé. Exécutez 'make logs' d'abord."; \
+		echo "💡 Alternative: sudo journalctl -u nox-api -n 20"; \
+		exit 1; \
+	fi
 
 test:  ## Exécuter les tests de l'API
 	@echo "Tests de l'API Nox..."

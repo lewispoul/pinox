@@ -1,0 +1,17 @@
+# Nox API Client - Requirements
+# Install with: pip install -r requirements.txt
+
+# Core HTTP client
+requests>=2.31.0
+
+# Optional: Enhanced JSON handling
+# (built-in json module is sufficient for basic usage)
+
+# Optional: Type checking support
+# typing_extensions>=4.0.0  # Only needed for Python < 3.8
+
+# Development dependencies (optional)
+# pytest>=7.0.0          # For unit testing
+# pytest-cov>=4.0.0      # For coverage reports
+# black>=23.0.0          # For code formatting
+# mypy>=1.0.0            # For type checking

@@ -1,0 +1,615 @@
+# Nox API — Plan maître + prompts Copilot par étapes
+
+> Objectif: orchestrer la création, la mise en service, les tests et le durcissement d’une mini‑plateforme « Nox API » sous Ubuntu 22.04, avec sandbox d’exécution, service systemd, reverse proxy optionnel, et outillage de tests. Chaque étape ci‑dessous est conçue comme un bloc autonome que tu peux coller à Copilot. Chaque prompt indique précisément le résultat attendu, le code à produire, et les critères d’acceptation. Si Copilot rencontre un problème complexe, il doit s’arrêter et produire un rapport selon la section « Politique d’arrêt ».
+
+---
+
+## 0. État actuel et cibles
+
+**État**
+
+* Service `nox-api` opérationnel localement, écoute 127.0.0.1:8080.
+* API fonctionnelle: `/health`, `/put`, `/run_py`, `/run_sh`.
+* Auth par Bearer token via `/etc/default/nox-api`.
+* Venv sous `/home/nox/nox/.venv`, code API sous `/home/nox/nox/api/`.
+
+**Cibles**
+
+1. Stabiliser l’arborescence, éliminer la dette de configuration, ajouter des tests reproductibles et un client CLI simple.
+2. Durcir systemd, journalisation propre, rotation des logs.
+3. Ajouter reverse proxy (Caddy par défaut) pour accès LAN ou HTTPS public, avec UFW.
+4. Documenter: README, troubleshooting.
+5. Ajouter hooks Git et automatiser quelques tâches dev.
+
+**Politique d’arrêt (Copilot)**
+
+* Si une demande implique une refonte ou touche simultanément le venv, systemd, et le reverse proxy, **arrêter** et produire un **rapport bloquant**: contexte, erreurs, logs `journalctl`, diff des fichiers modifiés, proposition de plan en 3 points, puis **attendre validation**.
+
+---
+
+## 1. Normalisation du dépôt et arborescence
+
+### Prompt Copilot — Étape 1
+
+**Rôle**: organiser le dépôt et générer l’arborescence standard.
+
+**Fais**
+
+* Crée la structure suivante côté repo (sans écraser des fichiers existants, créer si absent):
+
+```
+api/
+  nox_api.py              # API FastAPI
+deploy/
+  install_nox.sh          # install idempotente
+  nox-api.service         # unité systemd prête à copier
+  Caddyfile.example       # reverse proxy Caddy
+  nginx_nox.conf.example  # reverse proxy Nginx
+scripts/
+  noxctl                  # client CLI pour /health, /put, /run_py, /run_sh
+  tests.sh                # suite de tests locale
+tests/
+  curl_health.sh
+  curl_put.sh
+  curl_run_py.sh
+  curl_run_sh.sh
+hooks/
+  post-commit
+README.md
+```
+
+* Ajoute un `.editorconfig` et un `.gitignore` adaptés (Python, venv, logs, build).
+
+**Critères d’acceptation**
+
+* `git status` ne montre pas de fichiers temporaires ou de caches Python.
+* Tous les chemins listés existent, fichiers non vides avec en‑tête et TODO si contenu manquant.
+
+---
+
+## 2. API FastAPI — squelette robuste
+
+### Prompt Copilot — Étape 2
+
+**Rôle**: écrire un `api/nox_api.py` propre, minimal mais sûr.
+
+**Contraintes**
+
+* Endpoints: `/health` GET, `/put` POST multipart, `/run_py` POST JSON, `/run_sh` POST JSON.
+* Auth par Bearer token via header `Authorization` et env `NOX_API_TOKEN`.
+* Sandbox: toutes écritures sous `NOX_SANDBOX`. Interdire chemins absolus et échappements `..`.
+* Timeouts via `NOX_TIMEOUT` entier.
+* Blacklist minimale pour `/run_sh`.
+
+**Code à produire (point de départ concret)**
+
+```python
+# api/nox_api.py
+from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Depends
+from pydantic import BaseModel
+import os, pathlib, subprocess, shlex, typing as t
+
+app = FastAPI(title="Nox API")
+
+NOX_TOKEN = os.getenv("NOX_API_TOKEN", "").strip()
+SANDBOX = pathlib.Path(os.getenv("NOX_SANDBOX", "/home/nox/nox/sandbox")).resolve()
+TIMEOUT = int(os.getenv("NOX_TIMEOUT", "20"))
+FORBIDDEN = {"rm", "reboot", "shutdown", "mkfs", "dd", "mount", "umount", "kill", "pkill", "sudo"}
+SANDBOX.mkdir(parents=True, exist_ok=True)
+
+def require_token(auth: t.Optional[str] = Header(default=None, alias="Authorization")):
+    if not NOX_TOKEN:
+        return
+    if not auth or not auth.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if auth.split(" ", 1)[1].strip() != NOX_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+def safe_path(rel: str) -> pathlib.Path:
+    p = (SANDBOX / rel.lstrip("/")).resolve()
+    try:
+        p.relative_to(SANDBOX)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Path escapes sandbox")
+    return p
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+@app.post("/put")
+async def put_file(path: str, f: UploadFile = File(...), _=Depends(require_token)):
+    dest = safe_path(path)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(await f.read())
+    return {"saved": str(dest)}
+
+class RunPy(BaseModel):
+    code: str
+    filename: str = "run.py"
+
+@app.post("/run_py")
+def run_py(payload: RunPy, _=Depends(require_token)):
+    target = safe_path(payload.filename)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(payload.code, encoding="utf-8")
+    try:
+        proc = subprocess.run(["python3", str(target)], cwd=str(SANDBOX), capture_output=True, text=True, timeout=TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=408, detail="Timeout")
+    return {"returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+
+class RunSh(BaseModel):
+    cmd: str
+
+@app.post("/run_sh")
+def run_sh(payload: RunSh, _=Depends(require_token)):
+    parts = shlex.split(payload.cmd)
+    if not parts:
+        raise HTTPException(status_code=400, detail="Empty command")
+    if parts[0] in FORBIDDEN:
+        raise HTTPException(status_code=400, detail="Forbidden command")
+    try:
+        proc = subprocess.run(parts, cwd=str(SANDBOX), capture_output=True, text=True, timeout=TIMEOUT)
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=408, detail="Timeout")
+    return {"returncode": proc.returncode, "stdout": proc.stdout, "stderr": proc.stderr}
+```
+
+**Critères d’acceptation**
+
+* `uvicorn nox_api:app` démarre sans erreur.
+* Les quatre endpoints répondent comme attendu.
+
+---
+
+## 3. Script d’installation idempotent
+
+### Prompt Copilot — Étape 3
+
+**Rôle**: écrire `deploy/install_nox.sh` idempotent qui:
+
+* crée l’utilisateur `nox` et l’arborescence `/home/nox/nox/{api,sandbox,logs}`,
+* prépare le venv et installe `fastapi`, `uvicorn[standard]`, `pydantic`, `python-multipart`,
+* écrit `/etc/default/nox-api` avec `NOX_API_TOKEN`, `NOX_BIND_ADDR`, `NOX_PORT`, `NOX_SANDBOX`, `NOX_TIMEOUT`,
+* installe `deploy/nox-api.service` et active le service,
+* option: drapeau `--proxy=caddy|nginx` pour déposer le fichier de conf exemple.
+
+**Code à produire (squelette)**
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+NOX_USER=nox; NOX_HOME=/home/nox; NOX_ROOT=$NOX_HOME/nox
+NOX_API_DIR=$NOX_ROOT/api; NOX_SANDBOX=$NOX_ROOT/sandbox; NOX_VENV=$NOX_ROOT/.venv
+ENV_FILE=/etc/default/nox-api; UNIT=/etc/systemd/system/nox-api.service
+TOKEN=${NOX_API_TOKEN:-}
+
+# 1) user + arbo
+# 2) venv + deps
+# 3) copier api/nox_api.py vers $NOX_API_DIR
+# 4) écrire $ENV_FILE (si absent) avec valeurs par défaut
+# 5) installer $UNIT avec ExecStart=$NOX_VENV/bin/python3 -m uvicorn ...
+# 6) daemon-reload + enable + restart
+# 7) tests santé avec curl et sortie claire
+```
+
+**Critères d’acceptation**
+
+* Ré‑exécuter le script ne casse rien.
+* `systemctl status nox-api` actif, `curl /health` ok.
+
+---
+
+## 4. Unité systemd durcie
+
+### Prompt Copilot — Étape 4
+
+**Rôle**: fournir `deploy/nox-api.service` avec durcissement et injection d’env.
+
+**Exemple attendu**
+
+```ini
+[Unit]
+Description=Nox API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nox
+Group=nox
+EnvironmentFile=/etc/default/nox-api
+WorkingDirectory=/home/nox/nox/api
+ExecStart=/home/nox/nox/.venv/bin/python3 -m uvicorn nox_api:app --host ${NOX_BIND_ADDR} --port ${NOX_PORT}
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/nox/nox/sandbox
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+RuntimeMaxSec=12h
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Critères d’acceptation**
+
+* Le service démarre, l’API répond, pas de `203/EXEC`.
+
+---
+
+## 5. Reverse proxy Caddy et UFW
+
+### Prompt Copilot — Étape 5
+
+**Rôle**: proposer un `deploy/Caddyfile.example` pour un domaine `nox.example.org` et un accès LAN.
+
+**Exemple attendu**
+
+```
+# HTTP local
+:8081 {
+  reverse_proxy 127.0.0.1:8080
+}
+
+# HTTPS public
+nox.example.org {
+  encode gzip
+  reverse_proxy 127.0.0.1:8080 {
+    header_up Authorization {>Authorization}
+  }
+  log {
+    output file /var/log/caddy/nox_access.log
+  }
+}
+```
+
+**UFW**
+
+* Ouvre 80 et 443 si Caddy actif, ne pas ouvrir 8080.
+
+**Critères d’acceptation**
+
+* Santé accessible via `https://nox.example.org/health` si DNS en place.
+
+---
+
+## 6. Scripts de tests et client CLI
+
+### Prompt Copilot — Étape 6
+
+**Rôle**: produire `scripts/noxctl` et `scripts/tests.sh`.
+
+**Exemple `scripts/noxctl`**
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+BASE=${NOX_BASE:-http://127.0.0.1:8080}
+TOK=${NOX_TOKEN:-${NOX_API_TOKEN:-}}
+case "${1:-}" in
+  health) curl -s "$BASE/health" ;;
+  put)    curl -s -H "Authorization: Bearer $TOK" -F "f=@$2" "$BASE/put?path=$3" ;;
+  run_py) curl -s -X POST -H "Authorization: Bearer $TOK" -H "Content-Type: application/json" -d "$(jq -n --arg code "$2" --arg file "$3" '{code:$code,filename:$file}')" "$BASE/run_py" ;;
+  run_sh) curl -s -X POST -H "Authorization: Bearer $TOK" -H "Content-Type: application/json" -d "$(jq -n --arg cmd "$2" '{cmd:$cmd}')" "$BASE/run_sh" ;;
+  *) echo "usage: $0 health | put <src> <dst> | run_py <code> <filename> | run_sh <cmd>"; exit 1;;
+esac
+```
+
+**Exemple `scripts/tests.sh`**
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+export NOX_BASE=${NOX_BASE:-http://127.0.0.1:8080}
+export NOX_TOKEN=${NOX_TOKEN:-$(awk -F= '/^NOX_API_TOKEN=/{print $2}' /etc/default/nox-api 2>/dev/null || true)}
+
+echo "[TEST] health";   ./scripts/noxctl health | tee /tmp/nox_health.json
+
+echo "print('hello')" > /tmp/hello.py
+echo "[TEST] put";      ./scripts/noxctl put /tmp/hello.py tests/hello.py | tee /tmp/nox_put.json
+
+echo "[TEST] run_py";   ./scripts/noxctl run_py "print(2+3)" run.py | tee /tmp/nox_runpy.json
+
+echo "[TEST] run_sh";   ./scripts/noxctl run_sh "echo NOX_OK" | tee /tmp/nox_runsh.json
+```
+
+**Critères d’acceptation**
+
+* `./scripts/tests.sh` s’exécute sans erreur et enregistre les sorties.
+
+---
+
+## 7. Hooks Git
+
+### Prompt Copilot — Étape 7
+
+**Rôle**: fournir `hooks/post-commit` qui push automatiquement la branche courante vers `origin` si la remote existe.
+
+**Exemple attendu**
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+branch=$(git rev-parse --abbrev-ref HEAD)
+if git remote get-url origin >/dev/null 2>&1; then
+  git push -u origin "$branch" || true
+fi
+```
+
+**Critères d’acceptation**
+
+* Un commit local déclenche un push silencieux si possible.
+
+---
+
+## 8. Documentation
+
+### Prompt Copilot — Étape 8
+
+**Rôle**: écrire un `README.md` didactique, sections demandées:
+
+* Contexte et périmètre.
+* Installation rapide.
+* Variables d’environnement.
+* Sécurité systemd et sandbox.
+* Reverse proxy (Caddy et Nginx) avec exemples.
+* Tests et dépannage: `journalctl`, `systemctl`, CRLF, `ProtectHome` et venv sous `/home` vs `/opt`.
+
+**Critères d’acceptation**
+
+* Pas à pas exécutable sans connaissance préalable.
+
+---
+
+## 9. Option — Durcissement avancé
+
+### Prompt Copilot — Étape 9
+
+**Rôle**: proposer un patch pour déplacer le venv de `/home/nox/nox/.venv` vers `/opt/nox/.venv`, remettre `ProtectHome=yes`, et ajuster `ExecStart`.
+
+**Points clés**
+
+* Créer `/opt/nox/.venv` propriétaire `nox:nox`, droits 755.
+* Mettre à jour `deploy/install_nox.sh` et `deploy/nox-api.service`.
+* Vérifier que `ReadWritePaths` reste limité à la sandbox.
+
+**Critères d’acceptation**
+
+* Service démarre, tests passent, `ProtectHome=yes` rétabli.
+
+---
+
+## 10. Politique d’arrêt (rappel pour Copilot)
+
+Si l’une des situations suivantes survient, **arrête et produis un rapport**:
+
+* Modification simultanée des trois zones sensibles: venv, systemd, reverse proxy.
+* Erreurs récurrentes `203/EXEC` malgré correctifs.
+* Incompatibilités d’API ou de libs qui exigent migration majeure.
+
+**Format du rapport attendu**
+
+1. Résumé du contexte.
+2. Logs pertinents: commandes lancées, extraits `journalctl -u nox-api -n 100`, diffs de fichiers.
+3. Recommandations numérotées, simples, en trois points maximum.
+4. Liste d’actions que tu proposes d’exécuter **après validation**.
+
+---
+
+## 11. Feuille de route minimale
+
+* Étape 1 puis 2: dépôt propre et API confirmée.
+* Étape 3 puis 4: install idempotente et service durci.
+* Étape 6: outillage de tests et CLI.
+* Étape 5: reverse proxy et UFW.
+* Étape 8: documentation.
+* Étape 7: hooks Git.
+* Étape 9: durcissement avancé si nécessaire.
+
+---
+
+### Notes pour l’exécution pratique
+
+* Toujours vérifier les fins de ligne des scripts Bash, utiliser `dos2unix` si besoin.
+* Préférer `python3 -m uvicorn ...` dans `ExecStart` pour éviter les soucis de shebang.
+* En dev local, écouter 127.0.0.1. En LAN/HTTPS, passer par reverse proxy, n’expose pas 8080 au pare‑feu.
+
+old version
+# Plan global du projet NOX API + suivi
+
+## 1. Objectif général
+
+Mettre en place un service API (NOX API) exécuté par `systemd` qui permet de :
+
+* Recevoir et stocker des fichiers Python ou shell (`/put`)
+* Exécuter du code Python (
+  /run\_py)
+* Exécuter des commandes shell (
+  /run\_sh)
+* Fournir un endpoint de santé (
+  /health)
+
+## 2. Contexte actuel
+
+* **Service fonctionnel en manuel** : lancement en ligne de commande fonctionne (`uvicorn` dans le venv)
+* **Service systemd OK** : le démarrage automatique fonctionne
+* **Tests unitaires manuels** : /health, /put, /run\_py et /run\_sh répondent correctement
+* **Token API** : stocké dans `/etc/default/nox-api` et lu par l’API
+
+Problèmes encore à traiter :
+
+* Améliorer la sécurité (`ProtectHome=yes` avec déplacement du venv)
+* Automatiser les tests complets
+* Mettre en place un proxy HTTPS (Caddy ou Nginx)
+* Scripts de contrôle / maintenance (`noxctl`)
+
+## 3. Étapes avec prompts pour Copilot
+
+Chaque étape ci-dessous est un prompt distinct, destiné à Copilot, qui contient à la fois des instructions et du code pour orienter la génération. **Chaque prompt doit être exécuté indépendamment pour éviter toute confusion.**
+
+---
+
+### **Prompt 1 : Audit et génération du script d’installation complet**
+
+**But** : écrire un script `nox_bootstrap.sh` qui :
+
+1. Crée l’utilisateur et l’arborescence
+2. Installe le venv et les dépendances
+3. Installe le fichier `nox_api.py`
+4. Crée `/etc/default/nox-api` avec le token
+5. Configure et active le service systemd
+6. Lance les tests de base (/health, /put, /run\_py, /run\_sh)
+
+**Code de départ à inclure dans le prompt** :
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+NOX_USER=nox
+NOX_HOME=/home/nox
+NOX_ROOT=$NOX_HOME/nox
+NOX_API_DIR=$NOX_ROOT/api
+NOX_VENV=$NOX_ROOT/.venv
+TOKEN="CHANGE_ME"
+```
+
+**Instructions Copilot** :
+
+* Compléter le script pour couvrir toutes les étapes ci-dessus
+* Ajouter des messages `[NOX]` pour chaque étape
+* Si un problème bloquant est rencontré, ne pas corriger seul, générer un rapport clair avec logs
+
+---
+
+### **Prompt 2 : Script de tests automatisés**
+
+**But** : écrire `nox_tests.sh` qui :
+
+1. Récupère le token depuis `/etc/default/nox-api`
+2. Teste `/health`
+3. Teste `/put` avec un petit script Python
+4. Teste `/run_py` et vérifie la sortie
+5. Teste `/run_sh` et vérifie la sortie
+
+**Code de départ** :
+
+```bash
+#!/usr/bin/env bash
+TOKEN=$(awk -F= '/^NOX_API_TOKEN=/{print $2}' /etc/default/nox-api)
+BASE_URL="http://127.0.0.1:8080"
+```
+
+**Instructions Copilot** :
+
+* Le script doit être idempotent et afficher `[OK]` ou `[FAIL]`
+* En cas d’erreur, produire un log complet avec la réponse HTTP et le code retour
+
+---
+
+### **Prompt 3 : Migration vers ProtectHome=yes**
+
+**But** : déplacer le venv en dehors de `/home` pour pouvoir activer `ProtectHome=yes`
+
+1. Arrêter le service
+2. Copier le venv vers `/opt/nox/.venv`
+3. Modifier `nox-api.service` pour pointer sur le nouveau chemin
+4. Activer `ProtectHome=yes`
+5. Redémarrer et tester
+
+**Code à inclure** :
+
+```bash
+sudo systemctl stop nox-api
+sudo cp -a /home/nox/nox/.venv /opt/nox/.venv
+```
+
+**Instructions Copilot** :
+
+* Ne pas supprimer l’ancien venv tant que les tests ne sont pas passés
+* Si problème d’exécution, générer un rapport complet et attendre approbation
+
+---
+
+### **Prompt 4 : Mise en place d’un proxy HTTPS (Caddy)**
+
+**But** : créer un `Caddyfile` minimal pour exposer l’API en HTTPS avec un certificat automatique, tout en gardant l’accès interne sur 127.0.0.1:8080
+
+**Code à inclure** :
+
+```
+api.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+**Instructions Copilot** :
+
+* Générer la configuration complète avec installation de Caddy sur Ubuntu 22.04
+* Ne pas déployer automatiquement en production, proposer le script d’installation
+
+---
+
+### **Prompt 5 : Script de contrôle noxctl**
+
+**But** : créer un script shell `noxctl` qui facilite la gestion :
+
+* `noxctl status` : statut du service + état /health
+* `noxctl restart` : redémarre le service
+* `noxctl test` : lance `nox_tests.sh`
+
+**Code de départ** :
+
+```bash
+#!/usr/bin/env bash
+case "$1" in
+    status)
+        ;;
+    restart)
+        ;;
+    test)
+        ;;
+    *)
+        echo "Usage: $0 {status|restart|test}"
+        exit 1
+        ;;
+esac
+```
+
+**Instructions Copilot** :
+
+* Utiliser des couleurs ANSI pour lisibilité
+* En cas d’erreur, afficher un message clair et un code retour != 0
+
+---
+
+### **Prompt 6 : Rapport de problèmes complexes**
+
+**But** : définir un format unique de rapport que Copilot doit produire si un blocage complexe survient.
+
+**Exemple attendu** :
+
+```
+[NOX] Rapport de blocage
+Date: 2025-08-13 14:00 UTC
+Etape: Migration ProtectHome=yes
+Description: Impossible de démarrer le service après déplacement du venv
+Logs:
+    ...
+Proposition: Attendre validation avant de continuer
+```
+
+**Instructions Copilot** :
+
+* Toujours utiliser ce format exact
+* Inclure tous les logs pertinents et les commandes testées
+* Ne pas corriger automatiquement

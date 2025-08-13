@@ -1,5 +1,5 @@
-import { Suspense } from 'react';
 import EndpointsList from '@/components/EndpointsList';
+import { Suspense } from 'react';
 
 export default function Home() {
   return (

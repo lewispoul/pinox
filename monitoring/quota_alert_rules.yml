@@ -1,0 +1,141 @@
+groups:
+- name: nox-quotas
+  rules:
+  # Alertes pour quotas proches de la limite (80%)
+  - alert: NoxQuotaNearLimitRequestsHour
+    expr: (nox_quota_usage_ratio{quota_type="req_hour"} > 0.8) and (nox_quota_usage_ratio{quota_type="req_hour"} < 1.0)
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "User near hourly request limit"
+      description: "User {{ $labels.user_id }} is at {{ $value | humanizePercentage }} of their hourly request quota."
+
+  - alert: NoxQuotaNearLimitRequestsDay
+    expr: (nox_quota_usage_ratio{quota_type="req_day"} > 0.8) and (nox_quota_usage_ratio{quota_type="req_day"} < 1.0)
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "User near daily request limit"
+      description: "User {{ $labels.user_id }} is at {{ $value | humanizePercentage }} of their daily request quota."
+
+  - alert: NoxQuotaNearLimitCPU
+    expr: (nox_quota_usage_ratio{quota_type="cpu_seconds"} > 0.8) and (nox_quota_usage_ratio{quota_type="cpu_seconds"} < 1.0)
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "User near CPU quota limit"
+      description: "User {{ $labels.user_id }} is at {{ $value | humanizePercentage }} of their CPU quota."
+
+  - alert: NoxQuotaNearLimitMemory
+    expr: (nox_quota_usage_ratio{quota_type="mem_mb"} > 0.8) and (nox_quota_usage_ratio{quota_type="mem_mb"} < 1.0)
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "User near memory quota limit"
+      description: "User {{ $labels.user_id }} is at {{ $value | humanizePercentage }} of their memory quota."
+
+  - alert: NoxQuotaNearLimitStorage
+    expr: (nox_quota_usage_ratio{quota_type="storage_mb"} > 0.8) and (nox_quota_usage_ratio{quota_type="storage_mb"} < 1.0)
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "User near storage quota limit"
+      description: "User {{ $labels.user_id }} is at {{ $value | humanizePercentage }} of their storage quota."
+
+  - alert: NoxQuotaNearLimitFiles
+    expr: (nox_quota_usage_ratio{quota_type="files_max"} > 0.8) and (nox_quota_usage_ratio{quota_type="files_max"} < 1.0)
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "User near file count quota limit"
+      description: "User {{ $labels.user_id }} is at {{ $value | humanizePercentage }} of their file count quota."
+
+  # Alertes pour quotas dépassés (100%+)
+  - alert: NoxQuotaExceededRequestsHour
+    expr: nox_quota_usage_ratio{quota_type="req_hour"} >= 1.0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "User exceeded hourly request limit"
+      description: "User {{ $labels.user_id }} exceeded their hourly request quota ({{ $value | humanizePercentage }})."
+
+  - alert: NoxQuotaExceededRequestsDay
+    expr: nox_quota_usage_ratio{quota_type="req_day"} >= 1.0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "User exceeded daily request limit"
+      description: "User {{ $labels.user_id }} exceeded their daily request quota ({{ $value | humanizePercentage }})."
+
+  - alert: NoxQuotaExceededCPU
+    expr: nox_quota_usage_ratio{quota_type="cpu_seconds"} >= 1.0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "User exceeded CPU quota"
+      description: "User {{ $labels.user_id }} exceeded their CPU quota ({{ $value | humanizePercentage }})."
+
+  - alert: NoxQuotaExceededMemory
+    expr: nox_quota_usage_ratio{quota_type="mem_mb"} >= 1.0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "User exceeded memory quota"
+      description: "User {{ $labels.user_id }} exceeded their memory quota ({{ $value | humanizePercentage }})."
+
+  - alert: NoxQuotaExceededStorage
+    expr: nox_quota_usage_ratio{quota_type="storage_mb"} >= 1.0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "User exceeded storage quota"
+      description: "User {{ $labels.user_id }} exceeded their storage quota ({{ $value | humanizePercentage }})."
+
+  - alert: NoxQuotaExceededFiles
+    expr: nox_quota_usage_ratio{quota_type="files_max"} >= 1.0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "User exceeded file count quota"
+      description: "User {{ $labels.user_id }} exceeded their file count quota ({{ $value | humanizePercentage }})."
+
+  # Alertes pour violations fréquentes
+  - alert: NoxHighViolationRate
+    expr: increase(nox_quota_violations_total[1h]) > 10
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High quota violation rate"
+      description: "User {{ $labels.user_id }} has {{ $value }} quota violations in the last hour for {{ $labels.quota_type }}."
+
+  # Alertes système pour le monitoring global
+  - alert: NoxQuotaSystemDown
+    expr: up{job="nox-api"} == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Nox API quota system is down"
+      description: "The Nox API quota system has been down for more than 2 minutes."
+
+  - alert: NoxHighSystemResourceUsage
+    expr: sum(nox_user_cpu_seconds_total) / count(nox_user_cpu_seconds_total) > 1000
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High average CPU usage across users"
+      description: "Average CPU usage across all users is {{ $value }} seconds, indicating high system load."

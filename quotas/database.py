@@ -30,6 +30,29 @@ class QuotaDatabase:
         """Crée une connexion à la base de données"""
         return await asyncpg.connect(self.connection_string)
     
+    async def get_user_by_oauth_id(self, oauth_id: str) -> Optional[Dict[str, Any]]:
+        """Récupère un utilisateur par son oauth_id"""
+        conn = await self.connect()
+        try:
+            row = await conn.fetchrow("""
+                SELECT id, email, oauth_provider, oauth_id
+                FROM users WHERE oauth_id = $1
+            """, oauth_id)
+            
+            if row:
+                return {
+                    'id': row['id'],
+                    'email': row['email'],
+                    'oauth_provider': row['oauth_provider'],
+                    'oauth_id': row['oauth_id']
+                }
+            return None
+        except Exception as e:
+            print(f"Erreur récupération utilisateur par oauth_id {oauth_id}: {e}")
+            return None
+        finally:
+            await conn.close()
+    
     # Gestion des quotas utilisateur
     async def get_user_quotas(self, user_id: str) -> Optional[UserQuota]:
         """Récupère les quotas d'un utilisateur"""
@@ -242,11 +265,17 @@ class QuotaDatabase:
             
             violations = []
             for row in rows:
+                # Désérialiser le JSON si c'est une chaîne
+                detail = row['detail'] or {}
+                if isinstance(detail, str):
+                    import json
+                    detail = json.loads(detail)
+                
                 violations.append(QuotaViolation(
                     id=str(row['id']),
                     user_id=str(row['user_id']),
                     reason=row['reason'],
-                    detail=row['detail'] or {},
+                    detail=detail,
                     created_at=row['created_at']
                 ))
             

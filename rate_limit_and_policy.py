@@ -85,7 +85,7 @@ class RateLimitAndPolicyMiddleware(BaseHTTPMiddleware):
                     "kill", "pkill", "sudo", "su", "passwd", "chown", "chmod"
                 ]
             },
-            "audit": {"enabled": True, "log_file": "/home/nox/nox/logs/audit.jsonl"}
+            "audit": {"enabled": True, "log_file": "/home/lppoulin/nox-api-src/logs/audit.jsonl"}
         }
     
     def setup_audit_logging(self):
@@ -95,7 +95,7 @@ class RateLimitAndPolicyMiddleware(BaseHTTPMiddleware):
             self.audit_logger = None
             return
             
-        log_file = audit_config.get("log_file", "/home/nox/nox/logs/audit.jsonl")
+        log_file = audit_config.get("log_file", "/home/lppoulin/nox-api-src/logs/audit.jsonl")
         log_dir = Path(log_file).parent
         log_dir.mkdir(parents=True, exist_ok=True)
         

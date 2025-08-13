@@ -1,14 +1,14 @@
 #!/bin/bash
 
 # noxctl - Interface CLI unifiée pour Nox API
-# Version: 1.0
-# Auteur: COPILOT_PLAN.md - Étape 7
+# Version: 2.0 - Phase 2 Extensions
+# Auteur: COPILOT_PLAN.md - Étape 7 + Phase 2.1
 
 set -euo pipefail
 
 # Variables globales
 SCRIPT_NAME="noxctl"
-VERSION="1.0"
+VERSION="2.0"
 CONFIG_FILE="/etc/default/nox-api"
 API_BASE="http://127.0.0.1:8080"
 
@@ -298,6 +298,262 @@ cmd_runsh() {
     fi
 }
 
+# Commande: ls - Lister fichiers dans le sandbox  
+cmd_ls() {
+    local path="${1:-}"
+    
+    log_info "Liste des fichiers dans le sandbox${path:+: $path}"
+    
+    local token
+    token=$(get_auth_token) || return 1
+    
+    # Construire l'URL avec paramètre optionnel
+    local url="$API_BASE/api/files"
+    if [[ -n "$path" ]]; then
+        url="$url?path=$path"
+    fi
+    
+    local response
+    response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+        -H "Authorization: Bearer $token" \
+        -X GET \
+        "$url" 2>&1) || {
+        log_error "Impossible de lister les fichiers"
+        return 1
+    }
+    
+    local http_code
+    http_code=$(echo "$response" | tail -n1 | grep "HTTP_CODE:" | cut -d: -f2)
+    local body
+    body=$(echo "$response" | sed '$d')
+    
+    if [[ "$http_code" == "200" ]]; then
+        echo "$body" | jq -r '.files[]?' 2>/dev/null || echo "Aucun fichier"
+        log_success "Listage terminé"
+    else
+        log_error "Échec du listage (HTTP $http_code)"
+        echo "$body"
+        return 1
+    fi
+}
+
+# Commande: cat - Afficher le contenu d'un fichier
+cmd_cat() {
+    if [[ $# -lt 1 ]]; then
+        log_error "Usage: $SCRIPT_NAME cat <fichier>"
+        echo "Exemple: $SCRIPT_NAME cat scripts/test.py"
+        return 1
+    fi
+    
+    local file_path="$1"
+    
+    log_info "Lecture du fichier: $file_path"
+    
+    local token
+    token=$(get_auth_token) || return 1
+    
+    local response
+    response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+        -H "Authorization: Bearer $token" \
+        -X GET \
+        "$API_BASE/api/files/$(echo "$file_path" | sed 's|/|%2F|g')" 2>&1) || {
+        log_error "Impossible de lire le fichier"
+        return 1
+    }
+    
+    local http_code
+    http_code=$(echo "$response" | tail -n1 | grep "HTTP_CODE:" | cut -d: -f2)
+    local body
+    body=$(echo "$response" | sed '$d')
+    
+    if [[ "$http_code" == "200" ]]; then
+        echo "$body" | jq -r '.content' 2>/dev/null || echo "$body"
+    else
+        log_error "Fichier non trouvé ou erreur (HTTP $http_code)"
+        echo "$body"
+        return 1
+    fi
+}
+
+# Commande: rm - Supprimer un fichier
+cmd_rm() {
+    if [[ $# -lt 1 ]]; then
+        log_error "Usage: $SCRIPT_NAME rm <fichier>"
+        echo "Exemple: $SCRIPT_NAME rm scripts/old_script.py"
+        return 1
+    fi
+    
+    local file_path="$1"
+    
+    log_warn "Suppression du fichier: $file_path"
+    
+    # Confirmation de sécurité
+    read -p "Êtes-vous sûr? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        log_info "Annulation"
+        return 0
+    fi
+    
+    local token
+    token=$(get_auth_token) || return 1
+    
+    local response
+    response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+        -H "Authorization: Bearer $token" \
+        -X DELETE \
+        "$API_BASE/api/files/$(echo "$file_path" | sed 's|/|%2F|g')" 2>&1) || {
+        log_error "Impossible de supprimer le fichier"
+        return 1
+    }
+    
+    local http_code
+    http_code=$(echo "$response" | tail -n1 | grep "HTTP_CODE:" | cut -d: -f2)
+    local body
+    body=$(echo "$response" | sed '$d')
+    
+    if [[ "$http_code" == "200" ]] || [[ "$http_code" == "204" ]]; then
+        log_success "Fichier supprimé: $file_path"
+    else
+        log_error "Échec de la suppression (HTTP $http_code)"
+        echo "$body"
+        return 1
+    fi
+}
+
+# Commande: logs - Afficher les logs de l'API
+cmd_logs() {
+    local tail_lines="${1:-50}"
+    
+    # Extraire le nombre si format --tail=N
+    if [[ "$tail_lines" =~ ^--tail=([0-9]+)$ ]]; then
+        tail_lines="${BASH_REMATCH[1]}"
+    fi
+    
+    # Valider que c'est un nombre
+    if ! [[ "$tail_lines" =~ ^[0-9]+$ ]]; then
+        tail_lines=50
+    fi
+    
+    log_info "Récupération des $tail_lines dernières lignes de logs"
+    
+    local token
+    token=$(get_auth_token) || return 1
+    
+    local response
+    response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+        -H "Authorization: Bearer $token" \
+        -X GET \
+        "$API_BASE/api/logs?tail=$tail_lines" 2>&1) || {
+        log_error "Impossible de récupérer les logs"
+        return 1
+    }
+    
+    local http_code
+    http_code=$(echo "$response" | tail -n1 | grep "HTTP_CODE:" | cut -d: -f2)
+    local body
+    body=$(echo "$response" | sed '$d')
+    
+    if [[ "$http_code" == "200" ]]; then
+        echo "=== LOGS API (dernières $tail_lines lignes) ==="
+        echo "$body" | jq -r '.logs[]?' 2>/dev/null || echo "$body"
+    else
+        log_error "Échec récupération logs (HTTP $http_code)"
+        echo "$body"
+        return 1
+    fi
+}
+
+# Commande: status - Statut détaillé du système
+cmd_status() {
+    local full_mode=false
+    
+    if [[ "${1:-}" == "--full" ]]; then
+        full_mode=true
+    fi
+    
+    log_info "Statut du système Nox${full_mode:+ (mode détaillé)}"
+    
+    local token
+    token=$(get_auth_token) || return 1
+    
+    # 1. Health check basic
+    echo "=== SANTÉ API ==="
+    local health_response
+    health_response=$(curl -s -H "Authorization: Bearer $token" "$API_BASE/health" 2>/dev/null || echo "{}")
+    echo "$health_response" | jq '.' 2>/dev/null || echo "API inaccessible"
+    
+    if [[ "$full_mode" == true ]]; then
+        # 2. Statistiques système
+        echo -e "\n=== STATISTIQUES SYSTÈME ==="
+        local stats_response
+        stats_response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+            -H "Authorization: Bearer $token" \
+            -X GET \
+            "$API_BASE/api/system/stats" 2>&1) || {
+            echo "Stats non disponibles"
+        }
+        
+        local stats_code
+        stats_code=$(echo "$stats_response" | tail -n1 | grep "HTTP_CODE:" | cut -d: -f2 2>/dev/null || echo "000")
+        
+        if [[ "$stats_code" == "200" ]]; then
+            local stats_body
+            stats_body=$(echo "$stats_response" | sed '$d')
+            echo "$stats_body" | jq '.' 2>/dev/null || echo "$stats_body"
+        fi
+        
+        # 3. Informations disque
+        echo -e "\n=== ESPACE DISQUE ==="
+        cmd_runsh "df -h ." 2>/dev/null | tail -n +2 || echo "Info disque non disponible"
+        
+        # 4. Processus
+        echo -e "\n=== PROCESSUS NOX ==="
+        cmd_runsh "ps aux | grep -E 'nox|uvicorn' | grep -v grep" 2>/dev/null | tail -n +2 || echo "Aucun processus trouvé"
+    fi
+    
+    log_success "Statut récupéré"
+}
+
+# Commande: backup - Créer une sauvegarde
+cmd_backup() {
+    local backup_name="${1:-nox-backup-$(date +%Y%m%d-%H%M%S)}"
+    
+    log_info "Création de sauvegarde: $backup_name"
+    
+    local token
+    token=$(get_auth_token) || return 1
+    
+    # Données pour la requête de backup
+    local json_data
+    json_data=$(jq -n --arg name "$backup_name" '{name: $name}')
+    
+    local response
+    response=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+        -H "Authorization: Bearer $token" \
+        -H "Content-Type: application/json" \
+        -d "$json_data" \
+        -X POST \
+        "$API_BASE/api/backup" 2>&1) || {
+        log_error "Impossible de créer la sauvegarde"
+        return 1
+    }
+    
+    local http_code
+    http_code=$(echo "$response" | tail -n1 | grep "HTTP_CODE:" | cut -d: -f2)
+    local body
+    body=$(echo "$response" | sed '$d')
+    
+    if [[ "$http_code" == "200" ]] || [[ "$http_code" == "201" ]]; then
+        log_success "Sauvegarde créée: $backup_name"
+        echo "$body" | jq -r '.path // .message' 2>/dev/null || echo "Sauvegarde OK"
+    else
+        log_error "Échec de la sauvegarde (HTTP $http_code)"
+        echo "$body"
+        return 1
+    fi
+}
+
 # Affichage de l'aide
 show_help() {
     cat << EOF
@@ -306,41 +562,55 @@ $SCRIPT_NAME v$VERSION - Interface CLI unifiée pour Nox API
 USAGE:
     $SCRIPT_NAME <commande> [arguments...]
 
-COMMANDES:
+COMMANDES PRINCIPALES:
     health                              Vérifier l'état de l'API
     put <fichier_local> <chemin_remote> Uploader un fichier vers le sandbox
     runpy <code|fichier.py>            Exécuter du code Python
     runsh <commande>                   Exécuter une commande shell
+
+COMMANDES GESTION FICHIERS:
+    ls [path]                          Lister les fichiers du sandbox
+    cat <fichier>                      Afficher le contenu d'un fichier
+    rm <fichier>                       Supprimer un fichier (avec confirmation)
+
+COMMANDES SYSTÈME:
+    logs [--tail=N]                    Afficher les logs (défaut: 50 lignes)
+    status [--full]                    Statut système (--full pour détails)
+    backup [nom]                       Créer une sauvegarde
+
+UTILITAIRES:
     version                            Afficher la version
     help                               Afficher cette aide
 
 EXEMPLES:
-    # Vérifier que l'API fonctionne
-    $SCRIPT_NAME health
+    # Workflow complet
+    $SCRIPT_NAME ls                         # Lister fichiers
+    $SCRIPT_NAME put script.py scripts/    # Uploader
+    $SCRIPT_NAME cat scripts/script.py     # Vérifier
+    $SCRIPT_NAME runpy scripts/script.py   # Exécuter
     
-    # Uploader un script
-    $SCRIPT_NAME put ./mon_script.py scripts/mon_script.py
+    # Gestion fichiers
+    $SCRIPT_NAME ls scripts/               # Lister dossier spécifique
+    $SCRIPT_NAME rm old_script.py          # Nettoyer
     
-    # Exécuter du code Python direct
-    $SCRIPT_NAME runpy 'import os; print(os.getcwd())'
+    # Monitoring
+    $SCRIPT_NAME status --full             # Statut détaillé
+    $SCRIPT_NAME logs --tail=100           # Logs récents
+    $SCRIPT_NAME backup daily-backup       # Sauvegarde
     
-    # Exécuter un fichier Python
-    $SCRIPT_NAME runpy ./test.py
-    
-    # Exécuter une commande shell
-    $SCRIPT_NAME runsh 'ls -la /home/nox/nox/sandbox'
-    
-    # Chaîner des opérations
-    $SCRIPT_NAME put script.py scripts/script.py && $SCRIPT_NAME runpy scripts/script.py
+    # Exécution rapide
+    $SCRIPT_NAME runpy 'import os; print(os.listdir("."))'
+    $SCRIPT_NAME runsh 'df -h'
 
 CONFIGURATION:
     Token d'authentification lu depuis: $CONFIG_FILE
     API endpoint: $API_BASE
 
 NOTES:
-    - Tous les chemins pour 'put' sont relatifs au sandbox (/home/nox/nox/sandbox)
-    - Les exécutions Python et shell s'effectuent dans le sandbox sécurisé
-    - Un token Bearer valide est requis dans $CONFIG_FILE
+    - Nouvelles fonctionnalités Phase 2.1 ajoutées
+    - Gestion complète des fichiers sandbox
+    - Monitoring et sauvegarde intégrés
+    - Tous les chemins sont relatifs au sandbox sécurisé
     
 EOF
 }
@@ -362,6 +632,36 @@ main() {
         runsh)
             shift
             cmd_runsh "$@"
+            ;;
+        ls)
+            shift
+            cmd_ls "$@"
+            ;;
+        cat)
+            shift
+            cmd_cat "$@"
+            ;;
+        rm)
+            shift
+            cmd_rm "$@"
+            ;;
+        logs)
+            # Parse --tail=N argument ou nombre simple  
+            if [[ "${1:-}" =~ ^--tail=([0-9]+)$ ]]; then
+                cmd_logs "${BASH_REMATCH[1]}"
+            elif [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+                cmd_logs "${1}"
+            else
+                cmd_logs "${1:-50}"
+            fi
+            ;;
+        status)
+            shift
+            cmd_status "$@"
+            ;;
+        backup)
+            shift
+            cmd_backup "$@"
             ;;
         version)
             echo "$SCRIPT_NAME version $VERSION"

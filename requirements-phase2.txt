@@ -1,0 +1,22 @@
+# Dépendances Phase 2.1 - Rate Limiting et Audit  
+# Dépendances Phase 2.2 - Observabilité et Dashboard
+# Date: 13 août 2025
+
+# Core FastAPI (déjà installé)
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# Phase 2.1 - Sécurité et audit
+pyyaml>=6.0        # Pour parsing des politiques YAML
+psutil>=5.9.0      # Pour statistiques système (optionnel)
+cryptography>=41.0 # Pour signature HMAC avancée (futur)
+
+# Phase 2.2 - Observabilité 
+prometheus_client>=0.19.0  # Métriques Prometheus
+streamlit>=1.28.0          # Dashboard web interactif
+plotly>=5.17.0             # Graphiques avancés pour dashboard
+pandas>=2.1.0              # Manipulation données métriques
+
+# Développement et tests
+pytest>=7.4.0      # Tests automatisés
+pytest-asyncio>=0.21.0  # Tests async FastAPI

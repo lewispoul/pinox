@@ -1,0 +1,159 @@
+# Configuration des politiques de sécurité Nox API - Phase 2.1
+# Date: 13 août 2025
+
+# Rate limiting global
+rate_limits:
+  # Limites par IP
+  per_ip:
+    requests_per_minute: 60
+    burst_size: 10
+    
+  # Limites par token/utilisateur  
+  per_token:
+    requests_per_minute: 100
+    burst_size: 20
+    
+  # Limites par endpoint spécifique
+  endpoints:
+    "/run_py":
+      requests_per_minute: 30
+      max_execution_time: 60  # secondes
+    "/run_sh": 
+      requests_per_minute: 30
+      max_execution_time: 30  # secondes
+    "/put":
+      requests_per_minute: 50
+      max_file_size_mb: 10
+    "/api/backup":
+      requests_per_minute: 5   # Très limité
+      
+# Quotas par token
+quotas:
+  default:
+    # Temps CPU cumulé par jour (en secondes)
+    daily_cpu_seconds: 3600    # 1 heure
+    # Durée maximale par exécution
+    max_run_duration: 120      # 2 minutes  
+    # Taille maximale d'upload
+    max_upload_size_mb: 50
+    # Nombre de fichiers maximum
+    max_files: 1000
+    
+  # Quotas spéciaux pour les admins
+  admin:
+    daily_cpu_seconds: 7200    # 2 heures
+    max_run_duration: 300      # 5 minutes
+    max_upload_size_mb: 100
+    max_files: 5000
+
+# Commandes shell autorisées/interdites
+shell_policy:
+  # Mode: "whitelist" ou "blacklist" 
+  mode: "blacklist"
+  
+  # Commandes interdites (blacklist)
+  forbidden_commands:
+    - "rm"
+    - "rmdir" 
+    - "reboot"
+    - "shutdown"
+    - "mkfs"
+    - "dd"
+    - "mount"
+    - "umount"
+    - "kill"
+    - "pkill"
+    - "killall"
+    - "sudo"
+    - "su"
+    - "passwd"
+    - "chown"
+    - "chmod"
+    - "crontab"
+    - "service"
+    - "systemctl"
+    - "iptables"
+    - "fdisk"
+    - "parted"
+    - "format"
+    - "deluser"
+    - "userdel"
+    
+  # Commandes autorisées si mode whitelist (exemple)  
+  allowed_commands:
+    - "ls"
+    - "cat" 
+    - "echo"
+    - "grep"
+    - "find"
+    - "sort"
+    - "head"
+    - "tail"
+    - "wc"
+    - "awk"
+    - "sed"
+    - "curl"
+    - "wget"
+    - "python3"
+    - "node"
+    - "npm"
+    - "pip3"
+    - "git"
+    
+# Configuration de l'audit
+audit:
+  enabled: true
+  
+  # Fichier de logs d'audit
+  log_file: "/home/nox/nox/logs/audit.jsonl"
+  
+  # Rotation des logs
+  max_file_size_mb: 50
+  max_files: 10
+  
+  # Événements à auditer
+  events:
+    - "authentication"    # Tentatives d'auth
+    - "file_operations"   # Upload, suppression  
+    - "code_execution"    # run_py, run_sh
+    - "policy_violations" # Rate limit, quota dépassé
+    - "admin_operations"  # Backup, config
+    
+  # Champs à inclure dans l'audit
+  fields:
+    - "timestamp"
+    - "client_ip"
+    - "user_agent" 
+    - "token_id"
+    - "endpoint"
+    - "method"
+    - "payload_hash"
+    - "response_code"
+    - "execution_time_ms"
+    - "error_message"
+
+# Configuration HMAC pour signature des logs
+security:
+  # La clé HMAC sera lue depuis la variable d'env NOX_AUDIT_KEY
+  hmac_algorithm: "sha256"
+  
+  # Horodatage de sécurité
+  timestamp_tolerance_seconds: 300  # 5 minutes max de décalage
+  
+# Métadonnées de configuration  
+metadata:
+  version: "2.1.0"
+  created: "2025-08-13"
+  description: "Configuration de sécurité Phase 2.1 - Rate limiting, quotas et audit"
+  
+# Alertes et monitoring
+alerts:
+  # Seuils d'alerte
+  rate_limit_threshold: 0.8    # Alerte à 80% de la limite
+  quota_threshold: 0.9         # Alerte à 90% du quota
+  
+  # Canaux d'alerte (pour le futur)
+  channels:
+    - "logs"        # Toujours dans les logs
+    - "email"       # Si configuré  
+    - "webhook"     # Si configuré

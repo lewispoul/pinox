@@ -1,188 +1,138 @@
-# Nox API - Plateforme d'exécution sandbox
+# Nox API — README
 
-## Vue d'ensemble
+## 1. Overview
 
-Nox API est une mini-plateforme d'exécution sécurisée qui expose une API REST F## Prochaines étapes
+Nox API is a secure, sandboxed execution platform built on **FastAPI**, designed for running Python and shell commands in a controlled environment.
 
-### ✅ Complétées
+**Key use cases:**
 
-1. **Étape 1** : Installation standardisée ✅
-2. **Étape 2** : Script de réparation/maintenance (`nox_repair.sh` / `nox_repair_v2.sh`) ✅  
-3. **Étape 3** : Durcissement sécurisé - Venv migré vers `/opt/nox/.venv` ✅
+* Local or remote code execution over LAN or HTTPS
+* Automated script deployment and testing
+* DevOps sandbox for safe experimentation
 
-### 🔄 Suivantes
+**Key endpoints:** `/health`, `/put`, `/run_py`, `/run_sh`
+**Target OS:** Ubuntu 22.04
+**Deployment:** venv or Docker, with optional reverse proxy (Caddy/Nginx)
 
-4. **Étape 4** : Reverse-proxy Caddy/Nginx
-5. **Étape 5** : Client Python et tests automatiques
-6. **Étape 6** : Journalisation et rotation
-7. **Étape 7** : Outils de qualité de vie (`noxctl`)mettant l'exécution de code Python et Shell dans un environnement sandbox contrôlé.
+---
 
-## État actuel - Étapes 1, 2 & 3 (13 août 2025) ✅
+## 2. Features
 
-Les **Étapes 1, 2 et 3** du plan directeur ont été **complétées avec succès**.
+* Sandboxed execution — Restricts file paths and dangerous commands
+* Bearer token authentication
+* Systemd service — Automatic startup on boot
+* Reverse proxy ready — HTTPS with Caddy or Nginx
+* Git integration (optional) — Memory/history of scripts
+* Environment-based config — `/etc/default/nox-api`
 
-### Fonctionnalités implémentées
+---
 
-- ✅ **Service systemd** : `nox-api.service` avec durcissement sécuritaire
-- ✅ **API REST** : Endpoints `/health`, `/put`, `/run_py`, `/run_sh`
-- ✅ **Authentification** : Bearer token obligatoire
-- ✅ **Sandbox** : Isolation stricte dans `/home/nox/nox/sandbox`
-- ✅ **Durcissement** : SystemD avec `ProtectSystem=strict`, `ProtectHome=read-only`, `NoNewPrivileges`, etc.
-- ✅ **Scripts** : Installation idempotente et tests automatisés
-
-### Endpoints disponibles
-
-- `GET /health` - Vérification de santé
-- `POST /put` - Upload de fichiers (avec auth)
-- `POST /run_py` - Exécution de code Python (avec auth)
-- `POST /run_sh` - Exécution de commandes shell (avec auth, blacklist sécurisée)
-
-## Installation
-
-### Installation automatique
-```bash
-# Depuis le répertoire de développement
-./nox-api/deploy/install_nox.sh
-```
-
-### Validation
-```bash
-./validate_nox.sh
-```
-
-## Structure des fichiers
+## 3. Repository Structure
 
 ```
-nox-api-src/
-├── nox-api/
-│   ├── api/
-│   │   └── nox_api.py          # Code source de l'API
-│   ├── deploy/
-│   │   └── install_nox.sh      # Script d'installation idempotent
-│   └── tests/
-│       ├── curl_health.sh      # Test endpoint /health
-│       ├── curl_put.sh         # Test endpoint /put
-│       ├── curl_run_py.sh      # Test endpoint /run_py
-│       ├── curl_run_sh.sh      # Test endpoint /run_sh
-│       └── run_all_tests.sh    # Suite de tests complète
-├── validate_nox.sh             # Script de validation global
-└── COPILOT_PLAN.md            # Plan directeur complet
-```
-
-## Configuration système
-
-### Service systemd
-- **Fichier** : `/etc/systemd/system/nox-api.service`
-- **Utilisateur** : `nox`
-- **Port** : `127.0.0.1:8080` (local uniquement)
-- **Durcissement** : NoNewPrivileges, ProtectHome=read-only, ProtectSystem=full
-
-### Variables d'environnement
-- **Fichier** : `/etc/default/nox-api`
-- **NOX_API_TOKEN** : Token d'authentification Bearer
-- **NOX_SANDBOX** : `/home/nox/nox/sandbox`
-- **NOX_TIMEOUT** : `20` secondes
-- **NOX_BIND_ADDR** : `127.0.0.1`
-- **NOX_PORT** : `8080`
-
-### Arborescence
-```
-/home/nox/nox/
-├── .venv/              # Environnement virtuel Python
+nox/
 ├── api/
-│   └── nox_api.py      # Code de l'API
-├── sandbox/            # Zone d'exécution sécurisée
-└── logs/               # Logs de l'application
+│   └── nox_api.py
+├── deploy/
+│   ├── install_nox.sh
+│   ├── repair_nox.sh
+│   └── harden_nox.sh              # optional, step 3
+├── tests/
+│   ├── test_health.sh
+│   ├── test_put.sh
+│   ├── test_run_py.sh
+│   └── test_run_sh.sh
+├── systemd/
+│   └── nox-api.service
+└── README.md
 ```
 
-## Utilisation
+---
 
-### Test basique
+## 4. Installation
+
 ```bash
-# Health check
-curl http://127.0.0.1:8080/health
-
-# Upload (avec token)
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     -X POST "http://127.0.0.1:8080/put?path=test.txt" \
-     -F "f=@localfile.txt"
-
-# Exécution Python (avec token)
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     -H "Content-Type: application/json" \
-     -X POST "http://127.0.0.1:8080/run_py" \
-     -d '{"code": "print(\"Hello World\")"}'
-
-# Exécution Shell (avec token)
-curl -H "Authorization: Bearer YOUR_TOKEN" \
-     -H "Content-Type: application/json" \
-     -X POST "http://127.0.0.1:8080/run_sh" \
-     -d '{"cmd": "ls -la"}'
+git clone https://github.com/<your-org-or-user>/nox.git
+cd nox/deploy
+sudo bash install_nox.sh
 ```
 
-### Scripts de test
+---
+
+## 5. Configuration
+
+Edit `/etc/default/nox-api`:
+
+```ini
+NOX_API_TOKEN=replace_with_secure_token
+NOX_BIND_ADDR=127.0.0.1
+NOX_PORT=8080
+NOX_SANDBOX=/home/nox/nox/sandbox
+```
+
+Reload and restart:
+
 ```bash
-# Tests individuels
-./nox-api/tests/curl_health.sh
-./nox-api/tests/curl_put.sh TOKEN
-./nox-api/tests/curl_run_py.sh TOKEN
-./nox-api/tests/curl_run_sh.sh TOKEN
-
-# Suite complète
-./nox-api/tests/run_all_tests.sh TOKEN
+sudo systemctl daemon-reload
+sudo systemctl restart nox-api
 ```
 
-## Sécurité
+---
 
-### Authentification
-- Bearer token obligatoire pour tous les endpoints (sauf `/health`)
-- Token généré automatiquement lors de l'installation
+## 6. API Endpoints
 
-### Sandbox
-- Exécution confinée dans `/home/nox/nox/sandbox`
-- Protection contre l'échappement de chemin
-- Timeout configuré pour éviter les boucles infinies
+| Method | Endpoint | Description                      |
+| ------ | -------- | -------------------------------- |
+| GET    | /health  | Health check                     |
+| POST   | /put     | Upload file to sandbox           |
+| POST   | /run\_py | Execute Python code in sandbox   |
+| POST   | /run\_sh | Execute shell command in sandbox |
 
-### Durcissement SystemD
-- `NoNewPrivileges=yes` - Empêche l'escalade de privilèges
-- `ProtectHome=read-only` - Accès lecture seule au home
-- `ReadWritePaths=/home/nox/nox/sandbox` - Écriture autorisée uniquement dans sandbox
-- `ProtectSystem=full` - Protection du système
-- `PrivateTmp=yes` - Répertoire /tmp privé
+---
 
-### Blacklist Shell
-Commandes interdites : `rm`, `reboot`, `shutdown`, `mkfs`, `dd`, `mount`, `umount`, `kill`, `pkill`, `sudo`
+## 7. Security Notes
 
-## Prochaines étapes
+* Keep `/run_sh` limited to non-destructive commands
+* Always set a strong `NOX_API_TOKEN`
+* Restrict `NOX_SANDBOX` to safe directories
+* If exposed publicly, use HTTPS behind Caddy or Nginx and a firewall (UFW)
+* Consider systemd hardening options in `nox-api.service`
 
-Selon le plan directeur (COPILOT_PLAN.md) :
+---
 
-1. **Étape 2** : Script de réparation/maintenance (`nox_repair.sh`)
-2. **Étape 3** : Migration venv vers `/opt/nox/.venv` + `ProtectHome=yes`
-3. **Étape 4** : Reverse-proxy Caddy/Nginx
-4. **Étape 5** : Client Python et tests automatiques
-5. **Étape 6** : Journalisation et rotation
-6. **Étape 7** : Outils de qualité de vie (`noxctl`)
+## 8. Tests
 
-## Troubleshooting
+After installation:
 
-### Vérifier le service
 ```bash
-sudo systemctl status nox-api
-sudo journalctl -u nox-api -f
+bash tests/test_health.sh
+bash tests/test_put.sh
+bash tests/test_run_py.sh
+bash tests/test_run_sh.sh
 ```
 
-### Vérifier la configuration
-```bash
-sudo cat /etc/default/nox-api
-```
+---
 
-### Tests manuels
-```bash
-curl http://127.0.0.1:8080/health
-./validate_nox.sh
-```
+## 9. Troubleshooting
 
-## Support
+* Service status:
 
-Consultez le `COPILOT_PLAN.md` pour la documentation complète du plan directeur et les spécifications détaillées.
+  ```bash
+  sudo systemctl status nox-api
+  ```
+* Logs:
+
+  ```bash
+  sudo journalctl -u nox-api -n 100 --no-pager
+  ```
+* Common errors:
+
+  * 203/EXEC → wrong interpreter path in service file
+  * Connection refused → service not running or wrong bind address
+  * 401 Unauthorized → invalid `NOX_API_TOKEN`
+
+---
+
+## 10. License
+
+Choose a license (MIT, Apache 2.0, etc.) and include it here.

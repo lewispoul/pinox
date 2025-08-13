@@ -24,7 +24,6 @@ from quotas import (
     QuotaDatabase, 
     admin_router, 
     user_router,
-    initialize_quota_system,
     quota_metrics,
     get_quota_metrics_output
 )
@@ -333,4 +332,5 @@ if __name__ == "__main__":
     print(f"   Quotas: {'✅ ENABLED' if NOX_QUOTAS_ENABLED else '❌ DISABLED'}")
     print(f"   Metrics: {'✅ ENABLED' if NOX_METRICS_ENABLED else '❌ DISABLED'}")
     
-    uvicorn.run(app, host=host, port=port)
+    # Modes debug temporaire pour identifier les erreurs 500
+    uvicorn.run(app, host=host, port=port, log_level="debug", reload=True)

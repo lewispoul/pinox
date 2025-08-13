@@ -1,7 +1,7 @@
 """
 Admin routes for quota management
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 
@@ -17,6 +17,26 @@ admin_router = APIRouter(prefix="/quotas/admin", tags=["quotas-admin"])
 
 # Router pour les endpoints utilisateur
 user_router = APIRouter(prefix="/quotas", tags=["quotas"])
+
+async def get_current_user_id(request: Request) -> str:
+    """
+    Extrait l'UUID utilisateur depuis le token Bearer.
+    Utilise l'oauth_id pour trouver l'UUID dans la base de données.
+    """
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Token Bearer requis")
+    
+    token = auth_header.replace("Bearer ", "").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="Token vide")
+    
+    # Chercher l'utilisateur par oauth_id
+    user = await quota_db.get_user_by_oauth_id(token)
+    if not user:
+        raise HTTPException(status_code=404, detail=f"Utilisateur non trouvé pour le token")
+    
+    return str(user['id'])
 
 
 @admin_router.get("/users/{user_id}/quotas", response_model=UserQuota)
@@ -99,19 +119,17 @@ async def cleanup_old_violations(
 
 # Endpoints utilisateur (accès avec authentification normale)
 @user_router.get("/my/quotas")
-async def get_my_quotas(current_user_id: str = Depends(lambda: "placeholder")):
+async def get_my_quotas(current_user_id: str = Depends(get_current_user_id)):
     """Récupère ses propres quotas"""
-    # TODO: Remplacer par la vraie dépendance d'authentification
     quotas = await quota_db.get_user_quotas(current_user_id)
     if not quotas:
         raise HTTPException(status_code=404, detail="Your quotas not found")
-    return quotas
+    return quotas.to_dict()
 
 
 @user_router.get("/my/usage")
-async def get_my_usage(current_user_id: str = Depends(lambda: "placeholder")):
+async def get_my_usage(current_user_id: str = Depends(get_current_user_id)):
     """Récupère son propre usage"""
-    # TODO: Remplacer par la vraie dépendance d'authentification
     usage = await quota_db.get_user_usage(current_user_id)
     if not usage:
         # Créer un usage vide si pas trouvé
@@ -122,20 +140,20 @@ async def get_my_usage(current_user_id: str = Depends(lambda: "placeholder")):
     quotas = await quota_db.get_user_quotas(current_user_id)
     
     result = {
-        "usage": usage,
-        "quotas": quotas,
+        "usage": usage.to_dict() if usage else {},
+        "quotas": quotas.to_dict() if quotas else {},
         "percentages": {}
     }
     
     # Calculer les pourcentages d'usage
     if quotas:
         result["percentages"] = {
-            "req_hour": (usage.req_hour / max(quotas.quota_req_hour, 1)) * 100,
-            "req_day": (usage.req_day / max(quotas.quota_req_day, 1)) * 100,
-            "cpu_seconds": (usage.cpu_seconds / max(quotas.quota_cpu_seconds, 1)) * 100,
-            "mem_mb": (usage.mem_peak_mb / max(quotas.quota_mem_mb, 1)) * 100,
-            "storage_mb": (usage.storage_mb / max(quotas.quota_storage_mb, 1)) * 100,
-            "files_count": (usage.files_count / max(quotas.quota_files_max, 1)) * 100
+            "req_hour": (usage.req_hour / max(quotas.quota_req_hour or 1, 1)) * 100,
+            "req_day": (usage.req_day / max(quotas.quota_req_day or 1, 1)) * 100,
+            "cpu_seconds": (usage.cpu_seconds / max(quotas.quota_cpu_seconds or 1, 1)) * 100,
+            "mem_mb": (usage.mem_peak_mb / max(quotas.quota_mem_mb or 1, 1)) * 100,
+            "storage_mb": (usage.storage_mb / max(quotas.quota_storage_mb or 1, 1)) * 100,
+            "files_count": (usage.files_count / max(quotas.quota_files_max or 1, 1)) * 100
         }
     
     return result
@@ -143,14 +161,13 @@ async def get_my_usage(current_user_id: str = Depends(lambda: "placeholder")):
 
 @user_router.get("/my/violations")
 async def get_my_violations(
-    current_user_id: str = Depends(lambda: "placeholder"),
+    current_user_id: str = Depends(get_current_user_id),
     hours: int = Query(24, description="Hours to look back")
 ):
     """Récupère ses propres violations de quotas"""
-    # TODO: Remplacer par la vraie dépendance d'authentification
     violations = await quota_db.get_quota_violations(current_user_id, hours)
     return {
-        "violations": violations,
+        "violations": [v.to_dict() if hasattr(v, 'to_dict') else v for v in violations],
         "total": len(violations),
         "hours": hours
     }

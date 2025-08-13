@@ -4,13 +4,29 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
+# Solution rapide ChatGPT pour les imports
+from pathlib import Path
+import sys
+
+# ROOT = nox-api-src/
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from rate_limit_and_policy import RateLimitAndPolicyMiddleware
+from observability.metrics_chatgpt import metrics_response, update_sandbox_metrics
+from observability.middleware import MetricsMiddlewarejson, subprocess, shlex, tempfile, pathlib, glob, time
+from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Query, Request
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
+from typing import Optional, List
+
 # Import du middleware de sécurité Phase 2.1
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from rate_limit_and_policy import RateLimitAndPolicyMiddleware
 
 # Import des métriques Phase 2.2 - approche ChatGPT
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "observability"))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "observability"))
 from metrics_chatgpt import metrics_response, update_sandbox_metrics
 from middleware import MetricsMiddleware
 

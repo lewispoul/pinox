@@ -1,20 +1,25 @@
 # observability/metrics.py
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry
 import os, pathlib
+
+# Utiliser un registre personnalisé pour éviter les doublons
+registry = CollectorRegistry()
 
 REQS = Counter(
     "nox_requests_total",
     "Total des requêtes",
-    ["endpoint","method","code"]
+    ["endpoint","method","code"],
+    registry=registry
 )
 LAT = Histogram(
     "nox_request_seconds",
     "Durée des requêtes en secondes",
     ["endpoint","method","code"],
-    buckets=(0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10)
+    buckets=(0.01,0.025,0.05,0.1,0.25,0.5,1,2,5,10),
+    registry=registry
 )
-SANDBOX_FILES = Gauge("nox_sandbox_files","Nombre de fichiers dans le sandbox")
-SANDBOX_BYTES = Gauge("nox_sandbox_bytes","Taille totale sandbox en octets")
+SANDBOX_FILES = Gauge("nox_sandbox_files","Nombre de fichiers dans le sandbox", registry=registry)
+SANDBOX_BYTES = Gauge("nox_sandbox_bytes","Taille totale sandbox en octets", registry=registry)
 
 def update_sandbox_metrics(root: str) -> None:
     p = pathlib.Path(root)
@@ -32,4 +37,4 @@ def update_sandbox_metrics(root: str) -> None:
     SANDBOX_BYTES.set(size)
 
 def metrics_response():
-    return CONTENT_TYPE_LATEST, generate_latest()
+    return CONTENT_TYPE_LATEST, generate_latest(registry)

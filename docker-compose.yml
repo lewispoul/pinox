@@ -1,0 +1,174 @@
+# docker-compose.yml - Multi-service Nox deployment
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: nox-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-noxdb}
+      POSTGRES_USER: ${POSTGRES_USER:-nox}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nox123}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - nox-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-nox} -d ${POSTGRES_DB:-noxdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Nox API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: nox-api
+    environment:
+      # Database
+      NOX_DB_PATH: ${NOX_DB_PATH:-/app/data/nox.db}
+      NOX_DATABASE_URL: ${NOX_DATABASE_URL:-sqlite:///app/data/nox.db}
+      
+      # JWT
+      NOX_JWT_SECRET: ${NOX_JWT_SECRET:-nox-secret-change-in-production}
+      NOX_TOKEN_EXPIRE_MINUTES: ${NOX_TOKEN_EXPIRE_MINUTES:-480}
+      
+      # Admin
+      NOX_ADMIN_EMAIL: ${NOX_ADMIN_EMAIL:-admin@example.com}
+      NOX_ADMIN_PASSWORD: ${NOX_ADMIN_PASSWORD:-admin123}
+      
+      # API Config
+      NOX_BIND_ADDR: ${NOX_BIND_ADDR:-0.0.0.0}
+      NOX_PORT: ${NOX_PORT:-8081}
+      NOX_SANDBOX: ${NOX_SANDBOX:-/app/sandbox}
+      NOX_TIMEOUT: ${NOX_TIMEOUT:-30}
+      
+      # Metrics
+      NOX_METRICS_ENABLED: ${NOX_METRICS_ENABLED:-1}
+      
+      # OAuth2 (for future use)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+    volumes:
+      - api_data:/app/data
+      - api_sandbox:/app/sandbox
+      - api_logs:/app/logs
+    ports:
+      - "8000:8000"
+    networks:
+      - nox-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Streamlit Dashboard
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: nox-dashboard
+    environment:
+      NOX_API_URL: ${NOX_API_URL:-http://api:8081}
+    ports:
+      - "${DASHBOARD_PORT:-8501}:8501"
+    networks:
+      - nox-network
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: nox-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - nox-network
+    depends_on:
+      - api
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana Dashboard (Optional)
+  grafana:
+    image: grafana/grafana:10.0.3
+    container_name: nox-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - nox-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  api_data:
+    driver: local
+  api_sandbox:
+    driver: local
+  api_logs:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  nox-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

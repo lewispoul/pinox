@@ -4,15 +4,17 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from typing import Optional, List
 
-# Import du middleware de sécurité Phase 2.1
+# Solution rapide ChatGPT pour les imports
+from pathlib import Path
 import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from rate_limit_and_policy import RateLimitAndPolicyMiddleware
 
-# Import des métriques Phase 2.2 - approche ChatGPT
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "observability"))
-from metrics_chatgpt import metrics_response, update_sandbox_metrics
-from middleware import MetricsMiddleware
+# ROOT = nox-api-src/
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from rate_limit_and_policy import RateLimitAndPolicyMiddleware
+from observability.metrics_chatgpt import metrics_response, update_sandbox_metrics
+from observability.middleware import MetricsMiddleware
 
 app = FastAPI(
     title="Nox API",
@@ -57,7 +59,7 @@ def metrics():
     if not NOX_METRICS_ENABLED:
         raise HTTPException(status_code=404, detail="metrics disabled")
     # mise à jour ponctuelle des métriques sandbox
-    update_sandbox_metrics(os.getenv("NOX_SANDBOX","/home/nox/nox/sandbox"))
+    update_sandbox_metrics(str(SANDBOX))
     ct, payload = metrics_response()
     return Response(content=payload, media_type=ct)
 

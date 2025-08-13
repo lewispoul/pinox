@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-// import EndpointsList from '@/components/EndpointsList';
+import EndpointsList from '@/components/EndpointsList';
 
 export default function Home() {
   return (
@@ -101,10 +101,7 @@ export default function Home() {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                   </div>
                 }>
-                  {/* <EndpointsList /> */}
-                  <div className="text-gray-500 text-center py-8">
-                    EndpointsList component not found. Please create <code className="bg-gray-100 px-2 py-1 rounded">@/components/EndpointsList.tsx</code> to display endpoints.
-                  </div>
+                  <EndpointsList />
                 </Suspense>
               </div>
             </div>

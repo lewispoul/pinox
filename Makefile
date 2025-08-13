@@ -142,10 +142,27 @@ dev-test:  ## Tests de développement (sans authentification complète)
 	@echo "Tests de développement..."
 	@curl -s http://127.0.0.1:8080/health && echo " - Health OK" || echo " - Health FAIL"
 
-# Installation des outils (pour future étape 7)
-install-tools:  ## Installer les outils de ligne de commande (futur noxctl)
-	@echo "Installation des outils prévue pour l'Étape 7"
-	@echo "Pas encore implémenté - voir COPILOT_PLAN.md Étape 7"
+# Installation des outils CLI (Étape 7)
+install-tools:  ## Installer les outils de ligne de commande (noxctl + complétion)
+	@echo "Installation des outils CLI Nox API..."
+	@if [ ! -f "scripts/noxctl" ]; then \
+		echo "❌ Erreur: scripts/noxctl non trouvé"; \
+		exit 1; \
+	fi
+	@echo "📦 Installation de noxctl vers /usr/local/bin/"
+	@sudo cp scripts/noxctl /usr/local/bin/
+	@sudo chmod +x /usr/local/bin/noxctl
+	@echo "📦 Installation de la complétion bash..."
+	@sudo cp scripts/noxctl-completion.bash /etc/bash_completion.d/
+	@echo "🎯 Installation terminée!"
+	@echo ""
+	@echo "✅ noxctl installé: $(shell which noxctl 2>/dev/null || echo '/usr/local/bin/noxctl')"
+	@echo "✅ Complétion bash: /etc/bash_completion.d/noxctl-completion.bash"
+	@echo ""
+	@echo "💡 Utilisation:"
+	@echo "   source /etc/bash_completion.d/noxctl-completion.bash  # ou relancer bash"
+	@echo "   noxctl help                                            # afficher l'aide"
+	@echo "   noxctl health                                         # test API"
 
 # Cible par défaut
 all: install validate  ## Installation complète + validation

@@ -1,0 +1,27 @@
+# Python & venv
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+
+# Nox build/runtime
+nox/
+sandbox/
+*.log
+
+# Secrets et conf locales
+.env
+.env.*
+*.token
+*.secret
+/etc/default/nox-api
+Nox Shared.lnk
+
+# OS/Editeur
+.DS_Store
+Thumbs.db
+.vscode/
+.vscode-remote-containers/

@@ -308,4 +308,4 @@
 *Reference Documents:*
 - *Full Checklist: STAGING_VALIDATION_RELEASE_CHECKLIST.md*
 - *Ops Runbook: OPS_RELEASE_DAY_RUNBOOK.md*
-- *Quick Commands: docs/deployment-guides/PRODUCTION_CREDENTIALS_GUIDE.md*
+- *Quick Commands: OPS_QUICK_COMMAND_CARD.md*

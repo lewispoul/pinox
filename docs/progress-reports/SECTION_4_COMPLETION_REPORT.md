@@ -21,7 +21,7 @@
 
 
 ### **1. API User Guide** ✅ **COMPLETE**
-**File:** `docs-interactive/API_USER_GUIDE.md` (600+ lines)
+**File:** `API_USER_GUIDE.md` (600+ lines)
 **Purpose:** Comprehensive end-user documentation for NOX API v8.0.0 integration
 
 
@@ -39,7 +39,7 @@
 
 
 ### **2. Authentication Setup & Troubleshooting Guide** ✅ **COMPLETE**
-**File:** `docs-interactive/AUTHENTICATION_GUIDE.md` (550+ lines)  
+**File:** `AUTHENTICATION_GUIDE.md` (550+ lines)  
 **Purpose:** Specialized guide for OAuth2 setup and troubleshooting
 
 
@@ -54,7 +54,7 @@
 
 
 ### **3. Migration Guide v8.0.0** ✅ **COMPLETE**
-**File:** `docs-interactive/MIGRATION_GUIDE.md` (650+ lines)  
+**File:** `MIGRATION_GUIDE.md` (650+ lines)  
 **Purpose:** Complete migration documentation for upgrading to v8.0.0
 
 
@@ -70,7 +70,7 @@
 
 
 ### **4. Enhanced Deployment Documentation** ✅ **COMPLETE**
-**File:** `docs-interactive/ENHANCED_DEPLOYMENT_GUIDE.md` (500+ lines)  
+**File:** `ENHANCED_DEPLOYMENT_GUIDE.md` (500+ lines)  
 **Purpose:** Enterprise-grade deployment strategies and optimization
 
 

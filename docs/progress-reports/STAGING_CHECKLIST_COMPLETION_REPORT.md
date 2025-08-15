@@ -87,7 +87,7 @@
 
 ### **📖 Documentation & Quick Reference**
 
-✅ **docs/deployment-guides/PRODUCTION_CREDENTIALS_GUIDE.md** (300+ lines)
+✅ **RELEASE_TEAM_QUICK_REFERENCE.md** (300+ lines)
 - Emergency procedures and troubleshooting commands
 - Critical command reference for deployment team
 - Performance targets and success criteria tables
@@ -208,7 +208,7 @@ All scripts, configurations, and procedures are production-ready:
 
 5. **Load Testing:** `scripts/load-test.js`
 
-6. **Team Reference:** `docs/deployment-guides/PRODUCTION_CREDENTIALS_GUIDE.md`
+6. **Team Reference:** `RELEASE_TEAM_QUICK_REFERENCE.md`
 
 
 ### **🔄 PRODUCTION RELEASE PIPELINE**

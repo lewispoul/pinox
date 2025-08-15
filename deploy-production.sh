@@ -280,7 +280,7 @@ print_deployment_summary() {
     echo "  5. Configure load balancer if using multiple instances"
     echo ""
     echo "📞 Support:"
-    echo "  📖 Documentation: ./PRODUCTION_DEPLOYMENT_GUIDE.md"
+    echo "  📖 Documentation: ./docs/deployment-guides/PRODUCTION_DEPLOYMENT_GUIDE.md"
     echo "  📝 Logs: /var/log/nox/"
     echo "  🐳 Containers: docker-compose logs"
     echo ""

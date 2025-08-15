@@ -1,14 +1,32 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useState } from 'react';
 import { APITestResponse, Endpoint, PayloadSuggestion } from '../types/api';
-import AIHelper from './AIHelper';
-import LiveAPIExplorer from './LiveAPIExplorer';
-import PayloadGenerator from './PayloadGenerator';
-import SDKGenerator from './SDKGenerator';
 import { HoverCard, MorphingIcon, useFadeIn, useRipple } from './ui/Animations';
 import { AnimatedButton } from './ui/LoadingComponents';
 import { CollapsibleSection, useIsMobile, useTouchGestures } from './ui/ResponsiveUtils';
+
+// Lazy load heavy components
+const AIHelper = dynamic(() => import('./AIHelper'), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-32 rounded-lg"></div>,
+  ssr: false
+});
+
+const LiveAPIExplorer = dynamic(() => import('./LiveAPIExplorer'), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-64 rounded-lg"></div>,
+  ssr: false
+});
+
+const PayloadGenerator = dynamic(() => import('./PayloadGenerator'), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-48 rounded-lg"></div>,
+  ssr: false
+});
+
+const SDKGenerator = dynamic(() => import('./SDKGenerator'), {
+  loading: () => <div className="animate-pulse bg-gray-200 h-56 rounded-lg"></div>,
+  ssr: false
+});
 
 interface EndpointCardProps {
   endpoint: Endpoint;
@@ -85,7 +103,22 @@ export default function EndpointCard({ endpoint, isFavorite = false, onToggleFav
 
   const handleSuggestionApply = (suggestion: PayloadSuggestion) => {
     console.log('Applied suggestion:', suggestion);
-    // TODO: Implement suggestion application logic
+    
+    // Apply the suggestion based on its category
+    if (suggestion.category === 'payload' && suggestion.suggestion) {
+      // Apply payload suggestion by updating the generated payload
+      const suggestedPayload = JSON.stringify(suggestion.suggestion, null, 2);
+      setGeneratedPayload(suggestedPayload);
+      
+      // Show payload generator if not already shown
+      if (!showPayloadGenerator) {
+        setShowPayloadGenerator(true);
+      }
+    }
+    
+    // For other categories (parameters, headers, validation), 
+    // the suggestion is handled by the respective components
+    // This provides a centralized place for future enhancements
   };
 
   const handlePayloadGenerated = (payload: string) => {
@@ -559,7 +592,7 @@ function generateResponseExample(endpoint: Endpoint): string {
   }
   
   return `{
-  "status": "success",
+  "status": "success", 
   "data": {},
   "timestamp": "2025-08-13T19:45:00Z"
 }`;

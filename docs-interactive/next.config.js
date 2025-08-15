@@ -1,20 +1,13 @@
 /** @type {import('next').NextConfig} */
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+})
+
 const nextConfig = {
   // Enable experimental features for performance
   experimental: {
-    // Enable edge runtime for better performance
-    runtime: 'nodejs',
     // Enable webpack build cache
     webpackBuildWorker: true,
-    // Enable Turbopack for faster builds
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
-      },
-    },
   },
 
   // Performance optimizations
@@ -25,18 +18,6 @@ const nextConfig = {
   webpack: (config, { dev, isServer }) => {
     // Production optimizations
     if (!dev && !isServer) {
-      // Enable webpack bundle analyzer in development
-      if (process.env.ANALYZE === 'true') {
-        const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer');
-        config.plugins.push(
-          new BundleAnalyzerPlugin({
-            analyzerMode: 'static',
-            openAnalyzer: false,
-            reportFilename: '../bundle-analysis.html',
-          })
-        );
-      }
-
       // Optimize chunks
       config.optimization = {
         ...config.optimization,
@@ -141,4 +122,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withBundleAnalyzer(nextConfig);

@@ -1,3 +1,4 @@
+import ClientOnlyWebVitals from '@/components/ClientOnlyWebVitals';
 import { ThemeProvider } from "@/hooks/useTheme";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -33,6 +34,8 @@ export default function RootLayout({
       >
         <ThemeProvider>
           {children}
+          {/* Mount WebVitalsMonitor in development */}
+          <ClientOnlyWebVitals />
         </ThemeProvider>
       </body>
     </html>

@@ -307,3 +307,19 @@ export function usePerformanceProfiler(componentName: string, enabled = false) {
 
 // Import React for useState
 import { useState } from 'react';
+
+// Monitor hook for WebVitals component
+export function usePerformanceMonitor() {
+  const [isOptimizing, setIsOptimizing] = useState(false);
+
+  const optimizePerformance = useCallback(() => {
+    setIsOptimizing(true);
+    
+    // Simulate performance optimization
+    setTimeout(() => {
+      setIsOptimizing(false);
+    }, 2000);
+  }, []);
+
+  return { isOptimizing, optimizePerformance };
+}

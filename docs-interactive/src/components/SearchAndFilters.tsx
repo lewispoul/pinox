@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import debounce from 'lodash.debounce';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Endpoint } from '../types/api';
 
 interface SearchAndFiltersProps {
@@ -8,7 +9,6 @@ interface SearchAndFiltersProps {
   onFilteredEndpoints: (filtered: Endpoint[]) => void;
   availableTags: Array<{name: string; description: string}>;
   favorites: string[];
-  onToggleFavorite: (endpointId: string) => void;
 }
 
 type SortOption = 'name' | 'method' | 'recent' | 'favorites';
@@ -17,10 +17,10 @@ export default function SearchAndFilters({
   endpoints, 
   onFilteredEndpoints, 
   availableTags,
-  favorites,
-  onToggleFavorite 
+  favorites
 }: SearchAndFiltersProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [selectedMethods, setSelectedMethods] = useState<Set<string>>(new Set());
   const [showOnlyAuth, setShowOnlyAuth] = useState(false);
@@ -30,8 +30,26 @@ export default function SearchAndFilters({
 
   const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
 
+  // Create debounced search function
+  const debouncedSearch = useMemo(
+    () => debounce((query: string) => {
+      setSearchQuery(query);
+    }, 300),
+    []
+  );
+
+  // Update search query with debouncing
+  useEffect(() => {
+    debouncedSearch(localSearchQuery);
+    
+    // Cleanup function to cancel pending debounced calls
+    return () => {
+      debouncedSearch.cancel();
+    };
+  }, [localSearchQuery, debouncedSearch]);
+
   const filterAndSortEndpoints = useCallback(() => {
-    let filtered = endpoints.filter(endpoint => {
+    const filtered = endpoints.filter(endpoint => {
       const endpointId = `${endpoint.method}-${endpoint.path}`;
       
       // Search query filter
@@ -152,13 +170,13 @@ export default function SearchAndFilters({
         <input
           type="text"
           placeholder="Search endpoints by path, description, or tags..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={localSearchQuery}
+          onChange={(e) => setLocalSearchQuery(e.target.value)}
           className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm text-sm transition-all duration-200 hover:shadow-md"
         />
-        {searchQuery && (
+        {localSearchQuery && (
           <button
-            onClick={() => setSearchQuery('')}
+            onClick={() => setLocalSearchQuery('')}
             className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -279,7 +297,7 @@ export default function SearchAndFilters({
       {hasActiveFilters && (
         <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg border border-blue-200">
           <span className="font-medium">Active filters:</span>
-          {searchQuery && <span className="ml-2">Search: "{searchQuery}"</span>}
+          {searchQuery && <span className="ml-2">Search: &quot;{searchQuery}&quot;</span>}
           {selectedTag !== 'all' && <span className="ml-2">Tag: {selectedTag}</span>}
           {selectedMethods.size > 0 && <span className="ml-2">Methods: {Array.from(selectedMethods).join(', ')}</span>}
           {showOnlyAuth && <span className="ml-2">Auth Required</span>}
@@ -292,7 +310,7 @@ export default function SearchAndFilters({
 }
 
 function getMethodStyle(method: string) {
-  const styles = {
+  const styles: { [key: string]: { selected: string } } = {
     'GET': { selected: 'bg-blue-100 text-blue-800 border border-blue-300' },
     'POST': { selected: 'bg-green-100 text-green-800 border border-green-300' },
     'PUT': { selected: 'bg-yellow-100 text-yellow-800 border border-yellow-300' },

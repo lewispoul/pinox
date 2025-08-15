@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useFavorites } from '../hooks/useFavorites';
 import { Endpoint, OpenAPISpec } from '../types/api';
 import EndpointCard from './EndpointCard';
 import SearchAndFilters from './SearchAndFilters';
+import VirtualizedEndpointsList from './VirtualizedEndpointsList';
 
-export default function EndpointsList() {
+function EndpointsList() {
   const [endpoints, setEndpoints] = useState<Endpoint[]>([]);
   const [filteredEndpoints, setFilteredEndpoints] = useState<Endpoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,6 +15,11 @@ export default function EndpointsList() {
   const [availableTags, setAvailableTags] = useState<Array<{name: string; description: string}>>([]);
   
   const { favorites, isFavorite, toggleFavorite, favoritesCount } = useFavorites();
+
+  // Memoize the toggle function to prevent re-renders
+  const handleToggleFavorite = useCallback((endpointId: string) => {
+    toggleFavorite(endpointId);
+  }, [toggleFavorite]);
 
   useEffect(() => {
     const loadOpenAPISpec = async () => {
@@ -92,7 +98,7 @@ export default function EndpointsList() {
         onFilteredEndpoints={setFilteredEndpoints}
         availableTags={availableTags}
         favorites={favorites}
-        onToggleFavorite={toggleFavorite}
+        onToggleFavorite={handleToggleFavorite}
       />
 
       {/* Endpoints List */}
@@ -103,6 +109,14 @@ export default function EndpointsList() {
             <div className="text-lg font-medium mb-2">No endpoints found</div>
             <div className="text-sm">Try adjusting your search criteria or filters</div>
           </div>
+        ) : filteredEndpoints.length > 100 ? (
+          <VirtualizedEndpointsList
+            endpoints={filteredEndpoints}
+            favorites={favorites}
+            onToggleFavorite={handleToggleFavorite}
+            height={600}
+            itemHeight={180}
+          />
         ) : (
           filteredEndpoints.map((endpoint, index) => {
             const endpointId = `${endpoint.method}-${endpoint.path}`;
@@ -111,7 +125,7 @@ export default function EndpointsList() {
                 key={`${endpoint.method}-${endpoint.path}-${index}`} 
                 endpoint={endpoint}
                 isFavorite={isFavorite(endpointId)}
-                onToggleFavorite={() => toggleFavorite(endpointId)}
+                onToggleFavorite={() => handleToggleFavorite(endpointId)}
               />
             );
           })
@@ -166,3 +180,6 @@ export default function EndpointsList() {
     </div>
   );
 }
+
+// Export memoized component to prevent unnecessary re-renders
+export default memo(EndpointsList);

@@ -584,60 +584,73 @@ else
 fi
 set -e
 
-# =============================================================================
-# 10. Génération du rapport final
-# =============================================================================
+###############################################################################
+# 9b. Détection et réparation du drift de dépendances Python
+###############################################################################
 
-echo "[NOX REPAIR] === GÉNÉRATION DU RAPPORT ==="
+echo "[NOX REPAIR] === PHASE 9b: Vérification des dépendances Python ==="
 
-# S'assurer que le répertoire de logs existe
-sudo mkdir -p "$(dirname "$REPORT_FILE")"
-
-# Génération du rapport détaillé
-sudo tee "$REPORT_FILE" >/dev/null <<EOF
-# Rapport de réparation Nox API
-
-**Date**: $(date)
-**Durée**: Environ $(( SECONDS / 60 )) minutes
-**Status**: $(if [[ $TESTS_PASSED -eq $TESTS_TOTAL && ${#ISSUES_FOUND[@]} -eq 0 ]]; then echo "✅ SUCCÈS"; else echo "⚠️ ATTENTION REQUISE"; fi)
-
-## Résumé des réparations
-
-$(if [[ ${#REPAIRS_MADE[@]} -eq 0 ]]; then
-    echo "Aucune réparation nécessaire - système était sain"
+REQUIREMENTS_FILE="$NOX_API_DIR/requirements.txt"
+if [[ -f "$REQUIREMENTS_FILE" ]]; then
+    echo "[NOX REPAIR] Vérification des paquets Python vs requirements.txt..."
+    # Liste des paquets installés
+    INSTALLED=$(sudo -u $NOX_USER bash -c "source $NOX_VENV_DIR/bin/activate && pip freeze")
+    # Liste des paquets requis
+    REQUIRED=$(cat "$REQUIREMENTS_FILE")
+    # Différence
+    MISSING=$(echo "$REQUIRED" | grep -v '^#' | while read pkg; do
+        if ! echo "$INSTALLED" | grep -i "^$pkg" >/dev/null; then
+            echo "$pkg"
+        fi
+    done)
+    if [[ -n "$MISSING" ]]; then
+        echo "[NOX REPAIR] Paquets manquants ou obsolètes détectés:"
+        echo "$MISSING"
+        log_issue "Drift de dépendances Python"
+        if sudo -u $NOX_USER bash -c "source $NOX_VENV_DIR/bin/activate && pip install $MISSING"; then
+            log_repair "Dépendances Python synchronisées avec requirements.txt"
+        else
+            log_error "Échec de synchronisation des dépendances Python"
+        fi
+    else
+        echo "[NOX REPAIR] Toutes les dépendances Python sont à jour."
+    fi
 else
-    printf "### Réparations effectuées (%d):\n\n" ${#REPAIRS_MADE[@]}
-    for repair in "${REPAIRS_MADE[@]}"; do
-        echo "- ✓ $repair"
-    done
-fi)
+    echo "[NOX REPAIR] requirements.txt introuvable, drift non vérifié."
+fi
 
-## Issues identifiées
+###############################################################################
+# 9c. Vérification et réparation du service Redis
+###############################################################################
 
-$(if [[ ${#ISSUES_FOUND[@]} -eq 0 ]]; then
-    echo "Aucune issue détectée"
-else
-    printf "### Issues trouvées et corrigées (%d):\n\n" ${#ISSUES_FOUND[@]}
-    for issue in "${ISSUES_FOUND[@]}"; do
-        echo "- ⚠️ $issue"
-    done
-fi)
+echo "[NOX REPAIR] === PHASE 9c: Vérification du service Redis ==="
 
-## Tests de validation
+function check_redis {
+    if command -v redis-cli >/dev/null 2>&1; then
+        if redis-cli ping | grep -q PONG; then
+            echo "[NOX REPAIR] Redis opérationnel"
+            return 0
+        else
+            echo "[NOX REPAIR] Redis non joignable, tentative de redémarrage..."
+            sudo systemctl restart redis || sudo systemctl restart redis-server
+            sleep 2
+            if redis-cli ping | grep -q PONG; then
+                log_repair "Redis redémarré avec succès"
+                return 0
+            else
+                log_error "Échec du redémarrage de Redis"
+                return 1
+            fi
+        fi
+    else
+        echo "[NOX REPAIR] redis-cli non installé, vérification ignorée."
+        return 2
+    fi
+}
 
-**Résultats**: $TESTS_PASSED/$TESTS_TOTAL tests réussis
+check_redis
 
-- Test /health: $(if curl -s http://127.0.0.1:8080/health >/dev/null 2>&1; then echo "✅ OK"; else echo "❌ FAIL"; fi)
-- Test /put: $(if [[ $TESTS_PASSED -ge 2 ]]; then echo "✅ OK"; else echo "❌ FAIL"; fi)
-- Test /run_py: $(if [[ $TESTS_PASSED -ge 3 ]]; then echo "✅ OK"; else echo "❌ FAIL"; fi)
-- Test /run_sh: $(if [[ $TESTS_PASSED -ge 4 ]]; then echo "✅ OK"; else echo "❌ FAIL"; fi)
-
-## État actuel du système
-
-### Service systemd
-\`\`\`
-$(systemctl status nox-api --no-pager 2>/dev/null || echo "Service non disponible")
-\`\`\`
+# ...existing code...
 
 ### Configuration
 - **Utilisateur**: $NOX_USER $(if id "$NOX_USER" &>/dev/null; then echo "✅"; else echo "❌"; fi)

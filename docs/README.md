@@ -1,4 +1,3 @@
-
 # NOX API Documentation Index
 
 Welcome to the NOX API documentation! All guides, reports, and specifications are now organized by category for easy navigation.
@@ -94,6 +93,24 @@ For the most current project status, refer to:
 - **Deployment Help**: Check `/deployment-guides/` for operational guidance
 - **Planning Context**: Check `/planning/` for strategic documents
 - **Session Details**: Check `/session-reports/` for session-specific information
+
+## 🔒 Intelligent RBAC & Audit Logging
+
+NOX API includes an AI-powered policy engine for dynamic RBAC, role recommendations, and audit logging:
+
+- **Dynamic Access Control:** Real-time decisions based on user, resource, context, and risk.
+- **Role Recommendations:** ML-driven suggestions for user roles based on access patterns.
+- **Audit Logging:** All policy decisions are logged to the database and Redis for compliance and analysis.
+- **Risk-Based Authentication:** Additional authentication required for high-risk actions or contexts.
+
+**Usage:**
+- See `/ai/policy_engine.py` for implementation details and example usage.
+- All access requests are evaluated and logged automatically.
+- Operators can review audit logs in the database or Redis for compliance.
+
+**Onboarding:**
+- New contributors should review `/ai/policy_engine.py` and related docs for security architecture.
+- For custom policies, update the database table `ai_policies`.
 
 ---
 

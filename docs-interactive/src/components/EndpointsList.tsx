@@ -1,36 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Endpoint, OpenAPISpec } from '../types/api';
 import EndpointCard from './EndpointCard';
-
-interface OpenAPISpec {
-  paths: {
-    [path: string]: {
-      [method: string]: {
-        tags?: string[];
-        summary?: string;
-        description?: string;
-        parameters?: unknown[];
-        requestBody?: unknown;
-        responses: unknown;
-        security?: unknown[];
-      };
-    };
-  };
-  tags?: Array<{
-    name: string;
-    description: string;
-  }>;
-}
-
-interface Endpoint {
-  path: string;
-  method: string;
-  summary: string;
-  description: string;
-  tags: string[];
-  requiresAuth: boolean;
-}
 
 // Removed unused methodColors constant
 export default function EndpointsList() {

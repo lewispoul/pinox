@@ -1,15 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-
-interface Endpoint {
-  path: string;
-  method: string;
-  summary: string;
-  description: string;
-  tags: string[];
-  requiresAuth: boolean;
-}
+import { useCallback, useEffect, useState } from 'react';
+import { Endpoint, PayloadSuggestion, APITestResponse } from '../types/api';
+import AIHelper from './AIHelper';
+import PayloadGenerator from './PayloadGenerator';
+import LiveAPIExplorer from './LiveAPIExplorer';
 
 interface EndpointCardProps {
   endpoint: Endpoint;
@@ -25,10 +20,60 @@ const methodColors: { [key: string]: string } = {
 
 export default function EndpointCard({ endpoint }: EndpointCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [suggestions, setSuggestions] = useState<PayloadSuggestion[]>([]);
+  const [showPayloadGenerator, setShowPayloadGenerator] = useState(false);
+  const [showLiveExplorer, setShowLiveExplorer] = useState(false);
+  const [generatedPayload, setGeneratedPayload] = useState<string>('');
+  const [lastResponse, setLastResponse] = useState<APITestResponse | null>(null);
+
+  const loadAISuggestions = useCallback(async () => {
+    // Simulate loading AI suggestions
+    const aiSuggestions: PayloadSuggestion[] = [];
+    
+    if (endpoint.method === 'POST' && endpoint.requiresAuth) {
+      aiSuggestions.push({
+        confidence: 0.92,
+        suggestion: { "Authorization": "Bearer your-jwt-token" },
+        explanation: "This endpoint requires authentication via Bearer token",
+        category: 'headers'
+      });
+    }
+    
+    if (endpoint.method === 'POST') {
+      aiSuggestions.push({
+        confidence: 0.88,
+        suggestion: { validate: true, timeout: 30000 },
+        explanation: "Enable request validation and set a reasonable timeout",
+        category: 'validation'
+      });
+    }
+    
+    setSuggestions(aiSuggestions);
+  }, [endpoint.method, endpoint.requiresAuth]);
+
+  useEffect(() => {
+    // Load initial AI suggestions when component mounts
+    if (isExpanded) {
+      loadAISuggestions();
+    }
+  }, [isExpanded, loadAISuggestions]);
 
   const handleTryIt = () => {
-    // TODO: Implement in M9.3 - Live API Explorer
-    console.log('Try endpoint:', endpoint);
+    setShowPayloadGenerator(!showPayloadGenerator);
+    setShowLiveExplorer(!showLiveExplorer);
+  };
+
+  const handleSuggestionApply = (suggestion: PayloadSuggestion) => {
+    console.log('Applied suggestion:', suggestion);
+    // TODO: Implement suggestion application logic
+  };
+
+  const handlePayloadGenerated = (payload: string) => {
+    setGeneratedPayload(payload);
+  };
+
+  const handleResponseReceived = (response: APITestResponse) => {
+    setLastResponse(response);
   };
 
   return (
@@ -69,8 +114,15 @@ export default function EndpointCard({ endpoint }: EndpointCardProps) {
               }}
               className="px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
             >
-              Try it
+              {showLiveExplorer ? 'Hide Explorer' : 'Live Test'}
             </button>
+            
+            {/* AI Helper Integration */}
+            <AIHelper 
+              endpoint={endpoint} 
+              onSuggestionApply={handleSuggestionApply}
+            />
+            
             <svg
               className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
               fill="none"
@@ -112,7 +164,50 @@ export default function EndpointCard({ endpoint }: EndpointCardProps) {
       {/* Expanded Content */}
       {isExpanded && (
         <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Live API Explorer - Show when Try It is clicked */}
+            {showLiveExplorer && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <LiveAPIExplorer 
+                  endpoint={endpoint} 
+                  generatedPayload={generatedPayload}
+                  onResponseReceived={handleResponseReceived}
+                />
+              </div>
+            )}
+
+            {/* Payload Generator - Show when Try It is clicked */}
+            {showPayloadGenerator && (endpoint.method === 'POST' || endpoint.method === 'PUT' || endpoint.method === 'PATCH') && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <PayloadGenerator 
+                  endpoint={endpoint} 
+                  suggestions={suggestions}
+                  onPayloadGenerated={handlePayloadGenerated}
+                />
+              </div>
+            )}
+
+            {/* Response Preview */}
+            {lastResponse && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-gray-900">
+                    📊 Last Response
+                  </h4>
+                  <span className={`text-xs font-medium ${
+                    lastResponse.status >= 200 && lastResponse.status < 300 
+                      ? 'text-green-600' 
+                      : 'text-red-600'
+                  }`}>
+                    {lastResponse.status} - {Math.round(lastResponse.duration)}ms
+                  </span>
+                </div>
+                <div className="bg-gray-900 text-gray-100 p-3 rounded text-xs font-mono overflow-x-auto max-h-32">
+                  <pre>{JSON.stringify(lastResponse.data, null, 2)}</pre>
+                </div>
+              </div>
+            )}
+            
             {/* SDK Integration Example */}
             <div>
               <h4 className="text-sm font-medium text-gray-900 mb-2">
@@ -133,15 +228,26 @@ export default function EndpointCard({ endpoint }: EndpointCardProps) {
               </div>
             </div>
             
-            {/* AI Suggestions Placeholder */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center space-x-2">
-                <span className="text-blue-600">🤖</span>
-                <span className="text-sm font-medium text-blue-800">AI Assistant</span>
+            {/* AI Insights */}
+            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
+              <div className="flex items-center space-x-2 mb-2">
+                <span className="text-purple-600">🤖</span>
+                <span className="text-sm font-medium text-purple-800">AI Insights</span>
               </div>
-              <p className="text-sm text-blue-700 mt-1">
-                AI-powered suggestions and payload validation will be available in M9.2
-              </p>
+              <div className="text-sm text-purple-700 space-y-1">
+                {endpoint.requiresAuth && (
+                  <p>• This endpoint requires authentication - don&apos;t forget your Bearer token</p>
+                )}
+                {endpoint.method === 'POST' && (
+                  <p>• POST requests typically need a JSON payload in the request body</p>
+                )}
+                {endpoint.path.includes('/ai/') && (
+                  <p>• AI endpoints may take longer to respond due to model processing</p>
+                )}
+                {suggestions.length > 0 && (
+                  <p>• {suggestions.length} AI suggestions available - click the AI Assistant for help</p>
+                )}
+              </div>
             </div>
           </div>
         </div>

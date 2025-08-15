@@ -1,0 +1,356 @@
+# NOX API v8.0.0 Horizontal Pod Autoscaler Configuration
+# Advanced scaling policies for staging environment
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: nox-api-hpa-green
+  namespace: nox-staging-green
+  labels:
+    app: nox-api
+    version: v8.0.0
+    environment: staging
+    deployment-color: green
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nox-api-deployment-green
+  minReplicas: 3
+  maxReplicas: 15
+  
+  # Multi-metric scaling configuration
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  
+  # Memory-based scaling  
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  
+  # Custom metrics (if Prometheus metrics server is available)
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  
+  - type: Pods
+    pods:
+      metric:
+        name: websocket_connections_count
+      target:
+        type: AverageValue
+        averageValue: "50"
+        
+  # Advanced scaling behavior
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      # Allow aggressive scale up for sudden load
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      # But limit the absolute number to prevent overprovisioning
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+      selectPolicy: Max
+      
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      # Conservative scale down to maintain stability
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      # Absolute limit for scale down
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Min
+
+---
+# Vertical Pod Autoscaler (VPA) - Optional resource optimization
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: nox-api-vpa-green
+  namespace: nox-staging-green
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nox-api-deployment-green
+  updatePolicy:
+    updateMode: "Auto"
+    minReplicas: 3
+  resourcePolicy:
+    containerPolicies:
+    - containerName: nox-api
+      # Minimum resources to ensure functionality
+      minAllowed:
+        cpu: 100m
+        memory: 256Mi
+      # Maximum resources to prevent resource hogging
+      maxAllowed:
+        cpu: 1000m
+        memory: 2Gi
+      # Resource request scaling factors
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits
+
+---
+# Pod Monitor for Prometheus metrics collection
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: nox-api-podmonitor
+  namespace: nox-staging-green
+  labels:
+    app: nox-api
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: nox-api
+      version: v8.0.0
+  podMetricsEndpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+  - port: http
+    path: /metrics/scientific
+    interval: 60s
+    scrapeTimeout: 15s
+
+---
+# ServiceMonitor for service-level metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nox-api-servicemonitor
+  namespace: nox-staging-green
+  labels:
+    app: nox-api
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: nox-api
+      version: v8.0.0
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
+    honorLabels: true
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: 'nox_api_(.*)'
+      targetLabel: 'api_metric'
+      replacement: '${1}'
+
+---
+# PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: nox-api-alerts
+  namespace: nox-staging-green
+  labels:
+    app: nox-api
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+  - name: nox-api.rules
+    interval: 30s
+    rules:
+    
+    # High error rate alert
+    - alert: NOXAPIHighErrorRate
+      expr: rate(http_requests_total{job="nox-api",status=~"5.."}[5m]) > 0.05
+      for: 2m
+      labels:
+        severity: warning
+        service: nox-api
+        environment: staging
+      annotations:
+        summary: "NOX API high error rate detected"
+        description: "NOX API error rate is {{ $value | humanizePercentage }} which is above the 5% threshold"
+        runbook_url: "https://wiki.yourdomain.com/nox-api-troubleshooting#high-error-rate"
+    
+    # High response time alert  
+    - alert: NOXAPIHighResponseTime
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="nox-api"}[5m])) > 0.3
+      for: 3m
+      labels:
+        severity: warning
+        service: nox-api
+        environment: staging
+      annotations:
+        summary: "NOX API high response time detected"
+        description: "NOX API 95th percentile response time is {{ $value }}s which is above the 300ms threshold"
+        runbook_url: "https://wiki.yourdomain.com/nox-api-troubleshooting#high-response-time"
+    
+    # Pod crash looping
+    - alert: NOXAPIPodCrashLooping
+      expr: rate(kube_pod_container_status_restarts_total{namespace="nox-staging-green",pod=~"nox-api-.*"}[5m]) > 0
+      for: 1m
+      labels:
+        severity: critical
+        service: nox-api
+        environment: staging
+      annotations:
+        summary: "NOX API pod is crash looping"
+        description: "Pod {{ $labels.pod }} is restarting frequently"
+        runbook_url: "https://wiki.yourdomain.com/nox-api-troubleshooting#pod-crash-loop"
+    
+    # High memory usage
+    - alert: NOXAPIHighMemoryUsage
+      expr: (container_memory_usage_bytes{pod=~"nox-api-.*",namespace="nox-staging-green"} / container_spec_memory_limit_bytes) > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        service: nox-api
+        environment: staging
+      annotations:
+        summary: "NOX API high memory usage"
+        description: "Pod {{ $labels.pod }} memory usage is {{ $value | humanizePercentage }}"
+        runbook_url: "https://wiki.yourdomain.com/nox-api-troubleshooting#high-memory-usage"
+    
+    # WebSocket connection issues
+    - alert: NOXAPIWebSocketConnections
+      expr: nox_api_websocket_active_connections > 1000
+      for: 2m
+      labels:
+        severity: warning
+        service: nox-api
+        environment: staging
+      annotations:
+        summary: "NOX API high WebSocket connection count"
+        description: "Active WebSocket connections: {{ $value }}"
+    
+    # Scientific computation queue backup
+    - alert: NOXAPIComputationQueueBackup
+      expr: nox_api_computation_queue_pending > 100
+      for: 10m
+      labels:
+        severity: warning
+        service: nox-api
+        environment: staging
+      annotations:
+        summary: "NOX API computation queue backup"
+        description: "Pending computations: {{ $value }}"
+        runbook_url: "https://wiki.yourdomain.com/nox-api-troubleshooting#computation-queue"
+
+---
+# Grafana Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nox-api-grafana-dashboard
+  namespace: nox-staging-green
+  labels:
+    grafana_dashboard: "1"
+data:
+  nox-api-dashboard.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "NOX API v8.0.0 Staging Dashboard",
+        "tags": ["nox-api", "staging", "v8.0.0"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Request Rate",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{job=\"nox-api\"}[5m])",
+                "legendFormat": "{{ method }} {{ status }}"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "title": "Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job=\"nox-api\"}[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket{job=\"nox-api\"}[5m]))",
+                "legendFormat": "50th percentile"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Error Rate",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{job=\"nox-api\",status=~\"5..\"}[5m])",
+                "legendFormat": "5xx error rate"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "title": "Active Pods",
+            "type": "singlestat",
+            "targets": [
+              {
+                "expr": "count(up{job=\"nox-api\"} == 1)",
+                "legendFormat": "Active pods"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "title": "WebSocket Connections",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "nox_api_websocket_active_connections",
+                "legendFormat": "Active connections"
+              }
+            ]
+          },
+          {
+            "id": 6,
+            "title": "Scientific Computations",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(nox_api_computations_total[5m])",
+                "legendFormat": "{{ computation_type }}"
+              }
+            ]
+          }
+        ],
+        "time": {
+          "from": "now-1h",
+          "to": "now"
+        },
+        "refresh": "30s"
+      }
+    }

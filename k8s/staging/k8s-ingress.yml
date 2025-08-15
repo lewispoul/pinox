@@ -1,0 +1,334 @@
+# NOX API v8.0.0 Ingress Configuration for Staging
+# Blue-Green Deployment Support
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nox-api-ingress
+  namespace: nox-staging-green
+  labels:
+    app: nox-api
+    version: v8.0.0
+    environment: staging
+  annotations:
+    # Ingress Controller Configuration
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Performance Optimizations
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/client-max-body-size: "10m"
+    
+    # Timeout Configuration (WebSocket optimized)
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600" 
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    
+    # WebSocket Support
+    nginx.ingress.kubernetes.io/websocket-services: "nox-api-service-green"
+    
+    # Security Headers
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header Referrer-Policy "no-referrer-when-downgrade" always;
+      add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' wss: https:; frame-ancestors 'self';" always;
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    
+    # Rate Limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    nginx.ingress.kubernetes.io/rate-limit-connections: "10"
+    
+    # SSL Configuration  
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"
+    nginx.ingress.kubernetes.io/ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384"
+    
+    # Compression
+    nginx.ingress.kubernetes.io/enable-gzip: "true"
+    nginx.ingress.kubernetes.io/gzip-types: "text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript"
+    
+    # CORS Support
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "https://staging.yourdomain.com,https://admin-staging.yourdomain.com"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    
+    # Custom Error Pages
+    nginx.ingress.kubernetes.io/custom-http-errors: "404,503"
+    nginx.ingress.kubernetes.io/default-backend: "nox-api-error-page"
+    
+spec:
+  tls:
+  - hosts:
+    - staging-api.yourdomain.com
+    secretName: nox-api-staging-tls
+  rules:
+  - host: staging-api.yourdomain.com
+    http:
+      paths:
+      # Health checks (no authentication required)
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      - path: /ready
+        pathType: Exact
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      - path: /version
+        pathType: Exact
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      
+      # WebSocket connections
+      - path: /ws
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 3001
+      
+      # OAuth2 endpoints
+      - path: /api/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      
+      # API endpoints (authenticated)
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      
+      # Scientific computing endpoints
+      - path: /xtb
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      - path: /psi4
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      - path: /empirical
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      - path: /predict
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      
+      # Static assets and documentation
+      - path: /docs
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      - path: /assets
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+      
+      # Default catch-all
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nox-api-service-green
+            port:
+              number: 80
+
+---
+# Error Page Service for Custom 404/503 pages
+apiVersion: v1
+kind: Service
+metadata:
+  name: nox-api-error-page
+  namespace: nox-staging-green
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: nox-api-error-page
+
+---
+# Error Page Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nox-api-error-page
+  namespace: nox-staging-green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nox-api-error-page
+  template:
+    metadata:
+      labels:
+        app: nox-api-error-page
+    spec:
+      containers:
+      - name: error-page
+        image: nginx:alpine
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: error-pages
+          mountPath: /usr/share/nginx/html
+        - name: nginx-config
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: error-pages
+        configMap:
+          name: error-pages-config
+      - name: nginx-config
+        configMap:
+          name: error-pages-nginx-config
+
+---
+# Error Pages ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-pages-config
+  namespace: nox-staging-green
+data:
+  404.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>404 - NOX API Not Found</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center; }
+            .container { max-width: 600px; margin: 0 auto; }
+            h1 { font-size: 4em; margin: 0; opacity: 0.9; }
+            h2 { font-size: 1.5em; margin: 20px 0; opacity: 0.8; }
+            p { font-size: 1.1em; line-height: 1.6; margin: 20px 0; opacity: 0.7; }
+            .button { display: inline-block; padding: 12px 30px; background: rgba(255,255,255,0.2); color: white; text-decoration: none; border-radius: 25px; margin: 20px 10px; transition: background 0.3s; }
+            .button:hover { background: rgba(255,255,255,0.3); }
+            .code { font-family: 'Courier New', monospace; background: rgba(0,0,0,0.3); padding: 20px; border-radius: 10px; margin: 20px 0; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>404</h1>
+            <h2>NOX API Endpoint Not Found</h2>
+            <p>The requested API endpoint could not be found. Please check your request URL and try again.</p>
+            <div class="code">
+                <strong>Available Endpoints:</strong><br>
+                • /health - Health check<br>
+                • /api/auth/* - Authentication<br>
+                • /xtb/v1 - XTB calculations<br>
+                • /psi4/v1 - Psi4 computations<br>
+                • /predict/cj/v1 - CJ predictions
+            </div>
+            <a href="/docs" class="button">📖 View Documentation</a>
+            <a href="/health" class="button">🔍 Health Check</a>
+        </div>
+    </body>
+    </html>
+  503.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>503 - NOX API Service Unavailable</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 40px; background: linear-gradient(135deg, #ff7b7b 0%, #ff416c 100%); color: white; text-align: center; }
+            .container { max-width: 600px; margin: 0 auto; }
+            h1 { font-size: 4em; margin: 0; opacity: 0.9; }
+            h2 { font-size: 1.5em; margin: 20px 0; opacity: 0.8; }
+            p { font-size: 1.1em; line-height: 1.6; margin: 20px 0; opacity: 0.7; }
+            .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>503</h1>
+            <h2>Service Temporarily Unavailable</h2>
+            <p>The NOX API is currently undergoing maintenance or experiencing high load. Please try again in a few moments.</p>
+            <div class="spinner"></div>
+            <p><strong>Status:</strong> Staging Environment v8.0.0</p>
+        </div>
+    </body>
+    </html>
+
+---
+# Nginx config for error pages
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-pages-nginx-config
+  namespace: nox-staging-green
+data:
+  default.conf: |
+    server {
+        listen 8080;
+        server_name localhost;
+        
+        root /usr/share/nginx/html;
+        index index.html;
+        
+        error_page 404 /404.html;
+        error_page 503 /503.html;
+        
+        location = /404.html {
+            internal;
+        }
+        
+        location = /503.html {
+            internal;
+        }
+        
+        location /healthz {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }

@@ -5,9 +5,9 @@ All project documentation has been reorganized and moved to the `/docs` director
 
 ## 🔍 Quick Access
 
-- **📖 Full Documentation Index**: [`/docs/README.md`](./docs/README.md)
-- **📊 Current Progress**: [`/docs/progress-reports/M9_PROGRESS_TRACKER.md`](./docs/progress-reports/M9_PROGRESS_TRACKER.md)
-- **🎯 Latest Milestone**: [`/docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md`](./docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md)
+- **📖 Full Documentation Index**: [`/docs/README.md`](../docs/README.md)
+- **📊 Current Progress**: [`/docs/progress-reports/M9_PROGRESS_TRACKER.md`](../docs/progress-reports/M9_PROGRESS_TRACKER.md)
+- **🎯 Latest Milestone**: [`/docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md`](../docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md)
 - **🚀 Deployment Guides**: [`/docs/deployment-guides/`](./docs/deployment-guides/)
 - **📋 Planning Documents**: [`/docs/planning/`](./docs/planning/)
 

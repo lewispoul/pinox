@@ -18,14 +18,27 @@ Nox API is a secure, sandboxed execution platform built on **FastAPI**, designed
 
 ## 📚 Documentation
 
-**All project documentation has been organized in the [`/docs`](./docs/) directory:**
 
-* **📖 Complete Documentation Index**: [`/docs/README.md`](./docs/README.md)
-* **📊 Current Progress**: [`/docs/progress-reports/M9_PROGRESS_TRACKER.md`](./docs/progress-reports/M9_PROGRESS_TRACKER.md)
-* **🎯 Latest Milestone**: [`/docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md`](./docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md)
-* **🚀 Deployment Guides**: [`/docs/deployment-guides/`](./docs/deployment-guides/)
+### 📚 Documentation Structure
+All documentation is now organized in the [`/docs`](../docs/) directory for easy access and maintenance.
 
-For quick access to documentation navigation, see [`DOCUMENTATION.md`](./DOCUMENTATION.md).
+**Quick Links:**
+- [Documentation Index](../docs/README.md)
+- [Progress Tracker](../docs/progress-reports/M9_PROGRESS_TRACKER.md)
+- [Latest Milestone](../docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md)
+- [Deployment Guides](../docs/deployment-guides/)
+
+For navigation tips and a full directory map, see [`DOCUMENTATION.md`](../docs-interactive/DOCUMENTATION.md).
+
+---
+
+### 🚀 Onboarding for New Contributors
+1. **Start with the [Documentation Index](../docs/README.md)** for an overview of all available guides and reports.
+2. **Check the [Progress Tracker](../docs/progress-reports/M9_PROGRESS_TRACKER.md)** for current project status and milestones.
+3. **Review [Deployment Guides](../docs/deployment-guides/)** for setup and operational instructions.
+4. For technical questions, see the [FAQ](../docs/FAQ.md) or reach out via project channels listed in the documentation index.
+
+**Tip:** All documentation is grouped by type (milestones, progress, deployment, planning) for fast navigation. Use the index and directory map for guidance.
 
 ---
 

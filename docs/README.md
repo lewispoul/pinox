@@ -1,44 +1,37 @@
-# NOX API Documentation
 
-This directory contains all documentation files organized by category for the NOX API project.
+# NOX API Documentation Index
+
+Welcome to the NOX API documentation! All guides, reports, and specifications are now organized by category for easy navigation.
 
 ## 📁 Directory Structure
 
-### `/milestone-reports/`
-Contains completion reports for various milestones and steps in the project development.
+**Milestone Reports:**
+* `milestone-reports/` — Completion reports for major project milestones and steps.
 
-**Files:**
-- `COMPLETION_REPORT.md` - Overall completion report
-- `P3.1_COMPLETION_REPORT.md` - Phase 3.1 completion report  
-- `P3.2_COMPLETION_REPORT.md` - Phase 3.2 completion report
-- `STEP3_COMPLETION_REPORT.md` through `STEP7_COMPLETION_REPORT.md` - Individual step reports
-- `STEP21_COMPLETION_REPORT.md`, `STEP23_COMPLETION_REPORT.md` - Later step reports
-- `M9.1_COMPLETION_SUMMARY.md` through `M9.6_PERFORMANCE_COMPLETE.md` - M9 milestone reports
+**Phase Specifications:**
+* `phase-specifications/` — Detailed specifications for each project phase.
 
-### `/phase-specifications/`
-Contains detailed specifications for each project phase.
+**Progress Reports:**
+* `progress-reports/` — Progress tracking and status reports.
 
-**Files:**
-- `P3.1_MULTINODE_SPEC.md` - Multi-node architecture specification
-- `P3.2_AIIAM_SPEC.md` - AI-IAM integration specification
-- `P3.3_UXDEV_SPEC.md` - UX development specification
-- `P3.3_TYPESCRIPT_SDK_COMPLETE.md` - TypeScript SDK completion spec
+**Deployment Guides:**
+* `deployment-guides/` — Deployment and operational guides.
 
-### `/progress-reports/`
-Contains progress tracking and status reports.
+**Planning:**
+* `planning/` — Project planning documents and roadmaps.
 
-**Files:**
-- `P3_PROGRESS_REPORT.md` - Phase 3 overall progress
-- `PHASE2_PHASE3_PROGRESS.md` - Cross-phase progress report
-- `STEP24_PROGRESS.md`, `STEP25_PROGRESS.md` - Step-specific progress
-- `M9_PROGRESS_TRACKER.md` - M9 milestone progress tracker
+**Session Reports:**
+* `session-reports/` — Session logs and audit reports.
 
-### `/deployment-guides/`
-Contains deployment and operational guides.
+---
 
-**Files:**
-- `DEPLOYMENT.md` - Main deployment guide
-- `DEPLOYMENT_GUIDE.md` - Detailed deployment instructions
+## 🚀 Onboarding for New Contributors
+
+1. **Start here:** Review this index for an overview of all documentation categories.
+2. **Find your topic:** Use the directory map above to locate milestone reports, deployment guides, or progress trackers.
+3. **Need help?** See the FAQ or contact the project team via channels listed in the documentation index.
+
+**Tip:** All documentation is grouped by type for fast navigation. Use this index and the directory map for guidance.
 - `OAUTH2_GUIDE.md` - OAuth2 implementation guide
 
 ### `/session-reports/`

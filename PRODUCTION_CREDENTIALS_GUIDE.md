@@ -45,16 +45,13 @@ This document lists all production credentials and external resources required f
 5. Configure web application with production URLs
 
 **Required Configuration:**
-
-```
-
+```env
 Authorized JavaScript origins:
 - https://your-production-domain.com
 - https://api.your-production-domain.com
 
 Authorized redirect URIs:
 - https://your-production-domain.com/api/auth/google/callback
-
 ```
 
 
@@ -77,13 +74,10 @@ Authorized redirect URIs:
 3. Fill in application details with production URLs
 
 **Required Configuration:**
-
-```
-
+```env
 Application name: NOX API Production
 Homepage URL: https://your-production-domain.com
 Authorization callback URL: https://your-production-domain.com/api/auth/github/callback
-
 ```
 
 
@@ -106,13 +100,10 @@ Authorization callback URL: https://your-production-domain.com/api/auth/github/c
 3. Configure supported account types and redirect URI
 
 **Required Configuration:**
-
-```
-
+```env
 Name: NOX API Production
 Supported account types: Accounts in any organizational directory and personal Microsoft accounts
 Redirect URI (Web): https://your-production-domain.com/api/auth/microsoft/callback
-
 ```
 
 
@@ -132,9 +123,7 @@ Redirect URI (Web): https://your-production-domain.com/api/auth/microsoft/callba
 - [ ] **Backup strategy implemented**
 
 **Required Information:**
-
-```
-
+```env
 DATABASE_URL=postgresql://username:password@host:5432/database_name
 Database Host: your-db-host.com
 Database Port: 5432 (default)
@@ -142,7 +131,6 @@ Database Name: nox_production
 Database User: nox_admin
 Database Password: [SECURE-PASSWORD-HERE]
 SSL Mode: require
-
 ```
 
 
@@ -157,15 +145,12 @@ SSL Mode: require
 - [ ] **Memory limits configured**
 
 **Required Information:**
-
-```
-
+```env
 REDIS_URL=redis://:password@host:6379/0
 Redis Host: your-redis-host.com
 Redis Port: 6379 (default)
 Redis Password: [SECURE-PASSWORD-HERE]
 Redis Database: 0
-
 ```
 
 
@@ -183,12 +168,10 @@ Redis Database: 0
 **Generation Commands:**
 
 ```bash
-
 # Generate secure secrets (run these commands)
 JWT_SECRET=$(openssl rand -hex 32)
 JWT_REFRESH_SECRET=$(openssl rand -hex 32)
 SESSION_SECRET=$(openssl rand -hex 32)
-
 ```
 
 
@@ -228,13 +211,10 @@ SESSION_SECRET=$(openssl rand -hex 32)
 - [ ] **Subdomain for API configured**
 
 **Required DNS Records:**
-
-```
-
+```env
 A    @           [SERVER-IP-ADDRESS]
 A    www         [SERVER-IP-ADDRESS]
 CNAME api        your-domain.com
-
 ```
 
 
@@ -287,7 +267,6 @@ After obtaining all credentials, update `.env.production`:
 
 
 ```bash
-
 # Critical - Must be configured
 NODE_ENV=production
 NEXT_PUBLIC_APP_URL=https://your-domain.com
@@ -313,7 +292,6 @@ NEW_RELIC_LICENSE_KEY=[YOUR-NEW-RELIC-KEY]
 SMTP_HOST=smtp.your-provider.com
 SMTP_USER=[YOUR-SMTP-USER]
 SMTP_PASS=[YOUR-SMTP-PASSWORD]
-
 ```
 
 ---

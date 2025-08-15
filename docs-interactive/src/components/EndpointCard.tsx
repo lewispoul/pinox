@@ -12,6 +12,8 @@ import { CollapsibleSection, useIsMobile, useTouchGestures } from './ui/Responsi
 
 interface EndpointCardProps {
   endpoint: Endpoint;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
 const methodColors: { [key: string]: string } = {
@@ -22,7 +24,7 @@ const methodColors: { [key: string]: string } = {
   'PATCH': 'bg-purple-100 text-purple-800 border-purple-200',
 };
 
-export default function EndpointCard({ endpoint }: EndpointCardProps) {
+export default function EndpointCard({ endpoint, isFavorite = false, onToggleFavorite }: EndpointCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [suggestions, setSuggestions] = useState<PayloadSuggestion[]>([]);
   const [showPayloadGenerator, setShowPayloadGenerator] = useState(false);
@@ -137,6 +139,28 @@ export default function EndpointCard({ endpoint }: EndpointCardProps) {
             
             {/* Action Buttons */}
             <div className={`flex items-center space-x-2 ${isMobile ? 'flex-col space-y-1 space-x-0' : ''}`}>
+              {/* Favorite Button */}
+              {onToggleFavorite && (
+                <div title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}>
+                  <AnimatedButton
+                    onClick={() => onToggleFavorite()}
+                    variant="secondary"
+                    size={isMobile ? 'sm' : 'md'}
+                    className={`transition-all duration-200 ${
+                      isFavorite
+                        ? 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50 scale-110'
+                        : 'text-gray-400 hover:text-yellow-600 hover:bg-yellow-50'
+                    }`}
+                  >
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <span className={`transition-transform duration-200 ${isFavorite ? 'animate-bounce' : ''}`}>
+                        {isFavorite ? '⭐' : '☆'}
+                      </span>
+                    </div>
+                  </AnimatedButton>
+                </div>
+              )}
+              
               <AnimatedButton
                 onClick={() => {
                   setShowSDKGenerator(!showSDKGenerator);

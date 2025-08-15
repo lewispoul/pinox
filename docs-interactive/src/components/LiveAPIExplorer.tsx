@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { Endpoint, APITestRequest, APITestResponse, APITestResult } from '../types/api';
+import { useCallback, useState } from 'react';
+import { APITestRequest, APITestResponse, APITestResult, Endpoint } from '../types/api';
 
 interface LiveAPIExplorerProps {
   endpoint: Endpoint;

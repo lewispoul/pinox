@@ -14,6 +14,17 @@ Nox API is a secure, sandboxed execution platform built on **FastAPI**, designed
 **Target OS:** Ubuntu 22.04
 **Deployment:** venv or Docker, with optional reverse proxy (Caddy/Nginx)
 
+## 📚 Documentation
+
+**All project documentation has been organized in the [`/docs`](./docs/) directory:**
+
+* **📖 Complete Documentation Index**: [`/docs/README.md`](./docs/README.md)
+* **📊 Current Progress**: [`/docs/progress-reports/M9_PROGRESS_TRACKER.md`](./docs/progress-reports/M9_PROGRESS_TRACKER.md)
+* **🎯 Latest Milestone**: [`/docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md`](./docs/milestone-reports/M9.6_PERFORMANCE_COMPLETE.md)
+* **🚀 Deployment Guides**: [`/docs/deployment-guides/`](./docs/deployment-guides/)
+
+For quick access to documentation navigation, see [`DOCUMENTATION.md`](./DOCUMENTATION.md).
+
 ---
 
 ## 2. Features

@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function OAuthCallback() {
   const searchParams = useSearchParams();

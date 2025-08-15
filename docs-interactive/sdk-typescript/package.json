@@ -1,0 +1,66 @@
+{
+  "name": "@nox/api-sdk",
+  "version": "8.0.0",
+  "description": "Official TypeScript SDK for NOX API with AI-enhanced features and IAM 2.0 integration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "clean": "rm -rf dist",
+    "prepublish": "npm run clean && npm run build",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nox-ai/api-sdk.git",
+    "directory": "packages/typescript"
+  },
+  "keywords": [
+    "nox",
+    "api",
+    "sdk",
+    "typescript",
+    "ai",
+    "iam",
+    "multi-node",
+    "websocket"
+  ],
+  "author": "NOX AI Team",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.2",
+    "ws": "^8.17.1"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.10",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^7.13.0",
+    "@typescript-eslint/parser": "^7.13.0",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.12",
+    "ts-jest": "^29.1.4",
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  }
+}

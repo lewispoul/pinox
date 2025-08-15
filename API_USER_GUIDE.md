@@ -6,9 +6,11 @@
 
 ---
 
+
 ## 🎯 **OVERVIEW**
 
 The NOX API v8.0.0 is a comprehensive OAuth2 authentication system with advanced AI integration and exceptional developer experience. This guide provides complete documentation for developers integrating with the NOX API.
+
 
 ### **Key Features**
 - 🔐 **Multi-Provider OAuth2** - Google, GitHub, Microsoft authentication
@@ -20,19 +22,26 @@ The NOX API v8.0.0 is a comprehensive OAuth2 authentication system with advanced
 
 ---
 
+
 ## 🚀 **QUICK START**
+
 
 ### **1. Access the Interactive Documentation**
 Visit the NOX API documentation interface:
+
 ```
+
 https://your-nox-domain.com
+
 ```
+
 
 ### **2. Authenticate with OAuth2**
 Choose your preferred authentication method:
 - **Google OAuth2** - For Google Workspace integration
 - **GitHub OAuth2** - For developer-focused applications
 - **Microsoft OAuth2** - For enterprise Microsoft 365 integration
+
 
 ### **3. Explore API Endpoints**
 Use the interactive documentation to:
@@ -43,25 +52,36 @@ Use the interactive documentation to:
 
 ---
 
+
 ## 🔐 **AUTHENTICATION**
+
 
 ### **OAuth2 Flow Overview**
 
 The NOX API uses OAuth2 for secure authentication. Here's the complete flow:
 
+
 #### **1. Initiate Authentication**
+
 ```javascript
 // Redirect user to OAuth provider
 window.location.href = 'https://your-nox-domain.com/api/auth/google';
+
 ```
+
 
 #### **2. Handle Callback**
 After user grants permission, they're redirected back with an authorization code:
-```
-https://your-app.com/callback?code=AUTH_CODE&state=STATE_VALUE
+
 ```
 
+https://your-app.com/callback?code=AUTH_CODE&state=STATE_VALUE
+
+```
+
+
 #### **3. Exchange Code for Tokens**
+
 ```javascript
 const response = await fetch('/api/auth/token', {
   method: 'POST',
@@ -73,9 +93,12 @@ const response = await fetch('/api/auth/token', {
 });
 
 const { access_token, refresh_token } = await response.json();
+
 ```
 
+
 #### **4. Use Access Token**
+
 ```javascript
 const apiResponse = await fetch('/api/user/profile', {
   headers: {
@@ -83,11 +106,15 @@ const apiResponse = await fetch('/api/user/profile', {
     'Content-Type': 'application/json'
   }
 });
+
 ```
+
 
 ### **Provider-Specific Setup**
 
+
 #### **Google OAuth2**
+
 ```javascript
 // Configuration
 const googleConfig = {
@@ -100,9 +127,12 @@ const googleConfig = {
 // Initiate flow
 const authUrl = `https://accounts.google.com/oauth2/authorize?${new URLSearchParams(googleConfig)}`;
 window.location.href = authUrl;
+
 ```
 
+
 #### **GitHub OAuth2**
+
 ```javascript
 // Configuration  
 const githubConfig = {
@@ -115,9 +145,12 @@ const githubConfig = {
 // Initiate flow
 const authUrl = `https://github.com/login/oauth/authorize?${new URLSearchParams(githubConfig)}`;
 window.location.href = authUrl;
+
 ```
 
+
 #### **Microsoft OAuth2**
+
 ```javascript
 // Configuration
 const microsoftConfig = {
@@ -131,46 +164,75 @@ const microsoftConfig = {
 // Initiate flow
 const authUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${new URLSearchParams(microsoftConfig)}`;
 window.location.href = authUrl;
+
 ```
 
 ---
 
+
 ## 📡 **API ENDPOINTS**
+
 
 ### **Core Endpoints**
 
+
 #### **Authentication Endpoints**
 
+
 | Method | Endpoint | Description |
+
 |--------|----------|-------------|
+
 | GET | `/api/auth/google` | Initiate Google OAuth2 flow |
+
 | GET | `/api/auth/github` | Initiate GitHub OAuth2 flow |
+
 | GET | `/api/auth/microsoft` | Initiate Microsoft OAuth2 flow |
+
 | POST | `/api/auth/token` | Exchange authorization code for tokens |
+
 | POST | `/api/auth/refresh` | Refresh expired access token |
+
 | POST | `/api/auth/logout` | Revoke tokens and end session |
+
 
 #### **User Management Endpoints**
 
+
 | Method | Endpoint | Description |
+
 |--------|----------|-------------|
+
 | GET | `/api/user/profile` | Get authenticated user profile |
+
 | PUT | `/api/user/profile` | Update user profile information |
+
 | GET | `/api/user/sessions` | List active user sessions |
+
 | DELETE | `/api/user/sessions/:id` | Revoke specific session |
+
 
 #### **AI & Security Endpoints**
 
+
 | Method | Endpoint | Description |
+
 |--------|----------|-------------|
+
 | POST | `/api/ai/security/analyze` | Analyze request for security threats |
+
 | GET | `/api/ai/policy/evaluate` | Evaluate policy compliance |
+
 | POST | `/api/ai/biometric/verify` | Verify biometric authentication |
+
 | GET | `/api/ai/coordinator/status` | Get AI system status |
+
 
 ### **Example API Calls**
 
+
 #### **Get User Profile**
+
 ```javascript
 const response = await fetch('/api/user/profile', {
   method: 'GET',
@@ -182,9 +244,11 @@ const response = await fetch('/api/user/profile', {
 
 const userProfile = await response.json();
 console.log(userProfile);
+
 ```
 
 **Response:**
+
 ```json
 {
   "id": "user-uuid",
@@ -195,9 +259,12 @@ console.log(userProfile);
   "created_at": "2025-08-15T10:30:00Z",
   "last_login": "2025-08-15T14:25:00Z"
 }
+
 ```
 
+
 #### **Security Analysis**
+
 ```javascript
 const response = await fetch('/api/ai/security/analyze', {
   method: 'POST',
@@ -215,9 +282,11 @@ const response = await fetch('/api/ai/security/analyze', {
 });
 
 const analysis = await response.json();
+
 ```
 
 **Response:**
+
 ```json
 {
   "threat_level": "low",
@@ -229,22 +298,31 @@ const analysis = await response.json();
   ],
   "analysis_time_ms": 45
 }
+
 ```
 
 ---
 
+
 ## 📚 **SDK INTEGRATION**
+
 
 ### **Python SDK**
 
+
 #### **Installation**
+
 ```bash
 pip install nox-api-sdk
+
 ```
 
+
 #### **Basic Usage**
+
 ```python
 from nox_sdk import NOXClient
+
 
 # Initialize client
 client = NOXClient(
@@ -253,17 +331,21 @@ client = NOXClient(
     client_secret='your-client-secret'
 )
 
+
 # Authenticate user
 auth_url = client.get_auth_url('google', redirect_uri='https://your-app.com/callback')
 print(f"Visit: {auth_url}")
+
 
 # Exchange authorization code for tokens
 tokens = client.exchange_code('authorization-code', 'google')
 client.set_access_token(tokens['access_token'])
 
+
 # Get user profile
 profile = client.get_user_profile()
 print(profile)
+
 
 # AI Security Analysis
 analysis = client.analyze_security({
@@ -271,15 +353,20 @@ analysis = client.analyze_security({
     'user_agent': 'Mozilla/5.0...'
 })
 print(analysis)
+
 ```
 
+
 #### **Advanced Features**
+
 ```python
+
 # Biometric authentication
 biometric_result = client.verify_biometric({
     'type': 'fingerprint',
     'data': biometric_data
 })
+
 
 # Policy evaluation
 policy_result = client.evaluate_policy({
@@ -288,20 +375,28 @@ policy_result = client.evaluate_policy({
     'action': 'read'
 })
 
+
 # WebSocket for real-time updates
 ws_client = client.get_websocket_client()
 ws_client.on_message = lambda msg: print(f"Received: {msg}")
 ws_client.connect()
+
 ```
+
 
 ### **TypeScript SDK**
 
+
 #### **Installation**
+
 ```bash
 npm install @nox/api-sdk
+
 ```
 
+
 #### **Basic Usage**
+
 ```typescript
 import { NOXClient } from '@nox/api-sdk';
 
@@ -328,9 +423,12 @@ if (code) {
   const profile = await client.getUserProfile();
   console.log(profile);
 }
+
 ```
 
+
 #### **Advanced Features**
+
 ```typescript
 // AI Security Analysis with TypeScript types
 interface SecurityAnalysisRequest {
@@ -349,15 +447,20 @@ const wsClient = client.getWebSocketClient<SecurityAlert>();
 wsClient.onMessage((alert: SecurityAlert) => {
   console.log(`Security alert: ${alert.message}`);
 });
+
 ```
 
 ---
 
+
 ## ⚡ **PERFORMANCE OPTIMIZATION**
+
 
 ### **Best Practices**
 
+
 #### **Caching Strategies**
+
 ```javascript
 // Cache user profile for 5 minutes
 const cachedProfile = await client.getUserProfile({ cache: 300 });
@@ -369,9 +472,12 @@ const response = await fetch('/api/user/profile', {
     'Authorization': `Bearer ${accessToken}`
   }
 });
+
 ```
 
+
 #### **Rate Limiting**
+
 ```javascript
 // Implement exponential backoff
 async function retryRequest(fn, maxRetries = 3) {
@@ -387,24 +493,31 @@ async function retryRequest(fn, maxRetries = 3) {
     }
   }
 }
+
 ```
 
+
 #### **Bundle Optimization**
+
 ```javascript
 // Lazy load SDK components
 const { NOXClient } = await import('@nox/api-sdk');
 
 // Use dynamic imports for large features
 const biometricModule = await import('@nox/biometric-auth');
+
 ```
 
 ---
 
+
 ## 🛠️ **DEVELOPMENT TOOLS**
+
 
 ### **Interactive Documentation**
 
 The NOX API includes a comprehensive interactive documentation system:
+
 
 #### **Features**
 - **Real-time API Testing** - Test endpoints directly in the browser
@@ -413,25 +526,37 @@ The NOX API includes a comprehensive interactive documentation system:
 - **Authentication Integration** - Test with real OAuth2 flows
 - **Performance Monitoring** - View response times and Core Web Vitals
 
+
 #### **Using the Documentation**
+
 1. Visit `https://your-nox-domain.com`
+
 2. Browse available endpoints in the sidebar
+
 3. Click on any endpoint to expand details
+
 4. Use "Try It" button to test with real data
+
 5. Copy generated code samples to your project
+
 
 ### **Debugging Tools**
 
+
 #### **Enable Debug Mode**
+
 ```javascript
 const client = new NOXClient({
   baseUrl: 'https://your-nox-domain.com',
   debug: true, // Enable detailed logging
   timeout: 10000 // Set request timeout
 });
+
 ```
 
+
 #### **Performance Monitoring**
+
 ```javascript
 // Monitor API performance
 client.on('request', (request) => {
@@ -441,15 +566,20 @@ client.on('request', (request) => {
 client.on('response', (response) => {
   console.log(`API Response: ${response.status} (${response.duration}ms)`);
 });
+
 ```
 
 ---
 
+
 ## 🔒 **SECURITY BEST PRACTICES**
+
 
 ### **Token Management**
 
+
 #### **Secure Storage**
+
 ```javascript
 // Store tokens securely (avoid localStorage for sensitive data)
 const tokenStorage = {
@@ -462,9 +592,12 @@ const tokenStorage = {
     return getCookieValue('nox_token');
   }
 };
+
 ```
 
+
 #### **Token Refresh**
+
 ```javascript
 // Automatic token refresh
 client.interceptors.response.use(
@@ -481,11 +614,15 @@ client.interceptors.response.use(
     throw error;
   }
 );
+
 ```
+
 
 ### **Input Validation**
 
+
 #### **Client-Side Validation**
+
 ```javascript
 // Validate inputs before sending to API
 function validateUserInput(data) {
@@ -500,7 +637,9 @@ function validateUserInput(data) {
     }
   }
 }
+
 ```
+
 
 #### **Server-Side Security**
 The NOX API includes built-in security features:
@@ -512,12 +651,16 @@ The NOX API includes built-in security features:
 
 ---
 
+
 ## 📊 **MONITORING & ANALYTICS**
+
 
 ### **Performance Monitoring**
 
+
 #### **Core Web Vitals**
 The NOX API tracks key performance metrics:
+
 
 ```javascript
 // Monitor Core Web Vitals
@@ -528,9 +671,12 @@ getFID(console.log);  // First Input Delay
 getFCP(console.log);  // First Contentful Paint
 getLCP(console.log);  // Largest Contentful Paint
 getTTFB(console.log); // Time to First Byte
+
 ```
 
+
 #### **Custom Metrics**
+
 ```javascript
 // Track custom performance metrics
 client.trackMetric('api_call_duration', {
@@ -539,11 +685,15 @@ client.trackMetric('api_call_duration', {
   duration: 150,
   status: 200
 });
+
 ```
+
 
 ### **Error Tracking**
 
+
 #### **Automatic Error Reporting**
+
 ```javascript
 // Configure automatic error reporting
 client.configureErrorTracking({
@@ -551,9 +701,12 @@ client.configureErrorTracking({
   environment: 'production',
   release: 'v8.0.0'
 });
+
 ```
 
+
 #### **Custom Error Handling**
+
 ```javascript
 // Handle specific error types
 client.on('error', (error) => {
@@ -569,15 +722,20 @@ client.on('error', (error) => {
       break;
   }
 });
+
 ```
 
 ---
 
+
 ## 🚨 **TROUBLESHOOTING**
+
 
 ### **Common Issues**
 
+
 #### **Authentication Failures**
+
 ```javascript
 // Debug authentication issues
 if (error.status === 401) {
@@ -590,9 +748,12 @@ if (error.status === 401) {
     await client.refreshTokens();
   }
 }
+
 ```
 
+
 #### **CORS Issues**
+
 ```javascript
 // Handle CORS in development
 const client = new NOXClient({
@@ -600,18 +761,24 @@ const client = new NOXClient({
   corsMode: 'cors',
   credentials: 'include'
 });
+
 ```
 
+
 #### **Rate Limiting**
+
 ```javascript
 // Handle rate limits gracefully
 const retryAfter = error.headers['retry-after'];
 if (retryAfter) {
   setTimeout(() => retryRequest(), retryAfter * 1000);
 }
+
 ```
 
+
 ### **Getting Help**
+
 
 #### **Support Resources**
 - **Documentation:** https://your-nox-domain.com/docs
@@ -619,22 +786,33 @@ if (retryAfter) {
 - **Community Forum:** https://community.nox-api.com
 - **Email Support:** support@nox-api.com
 
+
 #### **Debugging Checklist**
+
 1. ✅ Check API endpoint URLs
+
 2. ✅ Verify authentication tokens
+
 3. ✅ Validate request payload format
+
 4. ✅ Check CORS configuration
+
 5. ✅ Review network connectivity
+
 6. ✅ Check rate limiting status
+
 7. ✅ Verify SSL/TLS configuration
 
 ---
 
+
 ## 📈 **MIGRATION & UPDATES**
+
 
 ### **Migrating to v8.0.0**
 
 If you're upgrading from a previous version:
+
 
 #### **Breaking Changes**
 - OAuth2 callback URLs updated
@@ -642,29 +820,46 @@ If you're upgrading from a previous version:
 - AI endpoints require additional permissions
 - Performance monitoring enabled by default
 
+
 #### **Migration Steps**
+
 1. Update OAuth2 redirect URIs in provider settings
+
 2. Implement refresh token handling
+
 3. Update SDK to v8.0.0
+
 4. Test authentication flows
+
 5. Enable performance monitoring
+
 
 ### **Version Compatibility**
 
+
 | Feature | v7.x | v8.0.0 |
+
 |---------|------|--------|
+
 | OAuth2 Authentication | ✅ | ✅ |
+
 | AI Security | ❌ | ✅ |
+
 | Performance Monitoring | ❌ | ✅ |
+
 | WebSocket Support | ❌ | ✅ |
+
 | Biometric Auth | ❌ | ✅ |
+
 | Interactive Docs | ❌ | ✅ |
 
 ---
 
+
 ## 🎯 **CONCLUSION**
 
 The NOX API v8.0.0 provides a comprehensive, secure, and performant authentication solution with advanced AI capabilities. This guide covers all essential integration patterns and best practices.
+
 
 ### **Key Takeaways**
 - 🔐 **Security First** - Built-in AI-powered threat detection
@@ -673,10 +868,15 @@ The NOX API v8.0.0 provides a comprehensive, secure, and performant authenticati
 - 📱 **Production Ready** - Enterprise-grade reliability and monitoring
 - 🤖 **AI Enhanced** - Intelligent security and policy management
 
+
 ### **Next Steps**
+
 1. Set up your OAuth2 providers
+
 2. Integrate the appropriate SDK
+
 3. Test with the interactive documentation
+
 4. Deploy to production with confidence
 
 ---

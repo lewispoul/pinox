@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """
-NOX API v8.0.0 Environment Verification Script
-Validates scientific computing dependencies and environment setup
+🔧 NOX API v8.0.0 - Environment Verification Script
+===================================================
+
+Comprehensive validation script for all scientific computing dependencies
+and environment requirements before staging deployment.
+
+Usage: python3 scripts/verify_env.py
 """
 
+import os
 import sys
 import subprocess
 import importlib
-import os
-from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Optional
+
 
 class EnvironmentValidator:
     def __init__(self):
@@ -49,7 +54,7 @@ class EnvironmentValidator:
             )
             return False
 
-    def validate_package_import(self, package_name: str, import_name: str = None) -> bool:
+    def validate_package_import(self, package_name: str, import_name: Optional[str] = None) -> bool:
         """Validate that a package can be imported successfully"""
         import_name = import_name or package_name
         
@@ -61,24 +66,25 @@ class EnvironmentValidator:
         except ImportError as e:
             self.log_result(package_name, False, str(e))
             return False
-        except Exception as e:
+        except (AttributeError, RuntimeError) as e:
+            # Catch specific exceptions that might occur during import
             self.log_result(package_name, False, f"Unexpected error: {str(e)}")
             return False
 
     def validate_rdkit(self) -> bool:
         """Special validation for RDKit with basic functionality test"""
         try:
-            from rdkit import Chem
-            from rdkit.Chem import rdMolDescriptors
+            from rdkit import Chem  # type: ignore
+            from rdkit.Chem import rdMolDescriptors  # type: ignore
             
             # Test basic molecule creation and descriptor calculation
             mol = Chem.MolFromSmiles('CCO')
             if mol is None:
-                raise Exception("Failed to create molecule from SMILES")
+                raise ValueError("Failed to create molecule from SMILES")
                 
             mw = rdMolDescriptors.CalcExactMolWt(mol)
             if not isinstance(mw, float) or mw <= 0:
-                raise Exception("Failed to calculate molecular weight")
+                raise ValueError("Failed to calculate molecular weight")
                 
             self.log_result("RDKit", True, f"Functional test passed (MW calculation: {mw:.2f})")
             return True
@@ -86,14 +92,14 @@ class EnvironmentValidator:
         except ImportError as e:
             self.log_result("RDKit", False, f"Import error: {str(e)}")
             return False
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             self.log_result("RDKit", False, f"Functionality test failed: {str(e)}")
             return False
 
     def validate_psi4(self) -> bool:
         """Validate Psi4 quantum chemistry package"""
         try:
-            import psi4
+            import psi4  # type: ignore
             
             # Test basic Psi4 functionality
             psi4.core.clean_options()
@@ -109,19 +115,19 @@ class EnvironmentValidator:
         except ImportError as e:
             self.log_result("Psi4", False, f"Import error: {str(e)}")
             return False
-        except Exception as e:
+        except (AttributeError, RuntimeError) as e:
             self.log_result("Psi4", False, f"Setup error: {str(e)}")
             return False
 
     def validate_cantera(self) -> bool:
         """Validate Cantera chemical kinetics library"""
         try:
-            import cantera as ct
+            import cantera as ct  # type: ignore
             
             # Test basic Cantera functionality
             gas = ct.Solution('gri30.yaml')
             if gas is None:
-                raise Exception("Failed to load GRI-Mech 3.0 mechanism")
+                raise ValueError("Failed to load GRI-Mech 3.0 mechanism")
                 
             # Test setting state
             gas.TPX = 300, 101325, 'CH4:1, O2:2, N2:7.52'
@@ -132,7 +138,7 @@ class EnvironmentValidator:
         except ImportError as e:
             self.log_result("Cantera", False, f"Import error: {str(e)}")
             return False
-        except Exception as e:
+        except (ValueError, RuntimeError, FileNotFoundError) as e:
             self.log_result("Cantera", False, f"Functionality test failed: {str(e)}")
             return False
 
@@ -143,7 +149,8 @@ class EnvironmentValidator:
             result = subprocess.run(['which', 'xtb'], 
                                   capture_output=True, 
                                   text=True, 
-                                  timeout=10)
+                                  timeout=10,
+                                  check=False)
             
             if result.returncode == 0:
                 xtb_path = result.stdout.strip()
@@ -152,14 +159,15 @@ class EnvironmentValidator:
                 version_result = subprocess.run([xtb_path, '--version'], 
                                               capture_output=True, 
                                               text=True, 
-                                              timeout=10)
+                                              timeout=10,
+                                              check=False)
                 
                 if version_result.returncode == 0:
-                    version_output = version_result.stdout.strip()
+                    # Note: version_output kept for debugging but not used in production
                     self.log_result("XTB", True, f"executable found at {xtb_path}")
                     return True
                 else:
-                    self.log_result("XTB", False, f"Executable found but version check failed")
+                    self.log_result("XTB", False, "Executable found but version check failed")
                     return False
             else:
                 self.log_result("XTB", False, "Executable not found in PATH")
@@ -168,7 +176,7 @@ class EnvironmentValidator:
         except subprocess.TimeoutExpired:
             self.log_result("XTB", False, "Command timeout - possible system issue")
             return False
-        except Exception as e:
+        except (OSError, ValueError) as e:
             self.log_result("XTB", False, f"Validation error: {str(e)}")
             return False
 
@@ -240,7 +248,7 @@ class EnvironmentValidator:
                     try:
                         os.makedirs(path, exist_ok=True)
                         continue
-                    except Exception:
+                    except (OSError, PermissionError):
                         permission_issues.append(f"{path} (cannot create)")
                         continue
                 else:
@@ -282,11 +290,11 @@ class EnvironmentValidator:
             try:
                 if validation_func():
                     passed += 1
-            except Exception as e:
+            except (ImportError, OSError, RuntimeError) as e:
                 self.log_result(step_name, False, f"Validation error: {str(e)}")
         
         print("\n" + "=" * 50)
-        print(f"📊 VALIDATION SUMMARY")
+        print("📊 VALIDATION SUMMARY")
         print(f"Passed: {passed}/{total}")
         print(f"Success Rate: {(passed/total)*100:.1f}%")
         
@@ -309,13 +317,13 @@ class EnvironmentValidator:
         ]
         
         if critical_failures:
-            print(f"\n🚨 CRITICAL FAILURES DETECTED - Environment NOT ready for staging!")
+            print("\n🚨 CRITICAL FAILURES DETECTED - Environment NOT ready for staging!")
             return False
         elif passed >= total * 0.8:  # 80% success rate required
-            print(f"\n✅ Environment validation PASSED - Ready for staging deployment!")
+            print("\n✅ Environment validation PASSED - Ready for staging deployment!")
             return True
         else:
-            print(f"\n⚠️  Environment validation PARTIAL - Review failures before proceeding")
+            print("\n⚠️  Environment validation PARTIAL - Review failures before proceeding")
             return False
 
 def main():
@@ -332,7 +340,9 @@ def main():
     except KeyboardInterrupt:
         print("\n\n⚠️  Validation interrupted by user")
         sys.exit(130)
-    except Exception as e:
+    except (ImportError, OSError, RuntimeError, SystemExit) as e:
+        if isinstance(e, SystemExit):
+            raise  # Let SystemExit propagate normally
         print(f"\n💥 Unexpected validation error: {str(e)}")
         sys.exit(1)
 

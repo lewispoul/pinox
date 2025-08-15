@@ -6,13 +6,16 @@
 
 ---
 
+
 ## 📋 **OVERVIEW**
 
 This comprehensive guide covers OAuth2 setup, troubleshooting, and best practices for the NOX API v8.0.0 authentication system. Whether you're setting up a new integration or debugging existing issues, this guide provides step-by-step solutions.
 
 ---
 
+
 ## 🚀 **INITIAL SETUP**
+
 
 ### **Prerequisites**
 
@@ -26,207 +29,315 @@ Before starting, ensure you have:
 
 ---
 
+
 ## 🔧 **OAUTH2 PROVIDER CONFIGURATION**
+
 
 ### **Google OAuth2 Setup**
 
+
 #### **Step 1: Create Google Cloud Project**
 
+
 1. Visit [Google Cloud Console](https://console.cloud.google.com)
+
 2. Create new project or select existing one
+
 3. Enable "Google+ API" and "OAuth2 API"
+
 
 #### **Step 2: Configure OAuth Consent Screen**
 
+
 1. Navigate to "APIs & Services" → "OAuth consent screen"
+
 2. Choose "External" user type (or "Internal" for G Suite)
+
 3. Fill required information:
 
+
 ```
+
 App name: Your NOX Application
 User support email: support@yourdomain.com
 Developer contact: developer@yourdomain.com
 Authorized domains: yourdomain.com
+
 ```
+
 
 #### **Step 3: Create OAuth2 Credentials**
 
+
 1. Go to "APIs & Services" → "Credentials"
+
 2. Click "Create Credentials" → "OAuth client ID"
+
 3. Choose "Web application"
+
 4. Configure redirect URIs:
 
+
 ```
+
 Authorized JavaScript origins:
 https://yourdomain.com
 
 Authorized redirect URIs:
 https://yourdomain.com/api/auth/google/callback
 https://yourdomain.com/auth/callback
+
 ```
+
 
 #### **Step 4: Update NOX Configuration**
 
 Add to your `.env` file:
 
+
 ```env
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 GOOGLE_REDIRECT_URI=https://yourdomain.com/api/auth/google/callback
+
 ```
+
 
 #### **Common Google OAuth Issues**
 
 **Issue:** "redirect_uri_mismatch"
 
+
 ```
+
 Solution:
+
 1. Verify redirect URI exactly matches Google Console
+
 2. Ensure HTTPS is used in production
+
 3. Check for trailing slashes
+
 ```
 
 **Issue:** "access_denied"
 
+
 ```
+
 Solution:
+
 1. Check OAuth consent screen approval status
+
 2. Verify app domain authorization
+
 3. Ensure required scopes are requested
+
 ```
+
 
 ### **GitHub OAuth2 Setup**
 
+
 #### **Step 1: Create GitHub OAuth App**
 
+
 1. Go to GitHub Settings → Developer settings → OAuth Apps
+
 2. Click "New OAuth App"
+
 3. Fill application details:
 
+
 ```
+
 Application name: Your NOX Application
 Homepage URL: https://yourdomain.com
 Authorization callback URL: https://yourdomain.com/api/auth/github/callback
+
 ```
+
 
 #### **Step 2: Configure NOX**
 
 Add to your `.env` file:
 
+
 ```env
 GITHUB_CLIENT_ID=your-github-client-id
 GITHUB_CLIENT_SECRET=your-github-client-secret
 GITHUB_REDIRECT_URI=https://yourdomain.com/api/auth/github/callback
+
 ```
+
 
 #### **Common GitHub OAuth Issues**
 
 **Issue:** "The redirect_uri MUST match the registered callback URL"
 
+
 ```
+
 Solution:
+
 1. Exact match required (case-sensitive)
+
 2. No query parameters allowed in registered URL
+
 3. Protocol (https://) must match
+
 ```
 
 **Issue:** "Application suspended"
 
+
 ```
+
 Solution:
+
 1. Check GitHub app status
+
 2. Verify terms of service compliance
+
 3. Contact GitHub support if needed
+
 ```
+
 
 ### **Microsoft OAuth2 Setup**
 
+
 #### **Step 1: Register Azure AD Application**
 
+
 1. Visit [Azure Portal](https://portal.azure.com)
+
 2. Navigate to "Azure Active Directory" → "App registrations"
+
 3. Click "New registration"
+
 4. Configure application:
 
+
 ```
+
 Name: Your NOX Application
 Supported account types: Accounts in any organizational directory and personal Microsoft accounts
 Redirect URI: https://yourdomain.com/api/auth/microsoft/callback
+
 ```
+
 
 #### **Step 2: Configure Authentication**
 
+
 1. In app registration, go to "Authentication"
+
 2. Add redirect URIs:
 
+
 ```
+
 Web:
 https://yourdomain.com/api/auth/microsoft/callback
 https://yourdomain.com/auth/callback
+
 ```
+
 
 3. Enable "ID tokens" and "Access tokens"
 
+
 #### **Step 3: Create Client Secret**
 
+
 1. Go to "Certificates & secrets"
+
 2. Click "New client secret"
+
 3. Set expiration period (recommended: 24 months)
+
 4. Save the secret value
+
 
 #### **Step 4: Configure NOX**
 
 Add to your `.env` file:
+
 
 ```env
 MICROSOFT_CLIENT_ID=your-azure-app-id
 MICROSOFT_CLIENT_SECRET=your-client-secret
 MICROSOFT_REDIRECT_URI=https://yourdomain.com/api/auth/microsoft/callback
 MICROSOFT_TENANT_ID=common
+
 ```
+
 
 #### **Common Microsoft OAuth Issues**
 
 **Issue:** "AADSTS50011: The reply URL specified in the request does not match"
 
+
 ```
+
 Solution:
+
 1. Verify redirect URI in Azure portal
+
 2. Check for URL encoding issues
+
 3. Ensure HTTPS is used
+
 ```
 
 **Issue:** "AADSTS700016: Application not found"
 
+
 ```
+
 Solution:
+
 1. Check client_id is correct
+
 2. Verify application is in correct tenant
+
 3. Ensure application is not deleted
+
 ```
 
 ---
 
+
 ## 🔍 **TROUBLESHOOTING GUIDE**
 
+
 ### **Common Authentication Flows Issues**
+
 
 #### **Issue 1: OAuth State Mismatch**
 
 **Symptoms:**
+
 ```
+
 Error: "invalid_request: state parameter mismatch"
+
 ```
 
 **Diagnosis:**
+
 ```javascript
 // Check state parameter handling
 console.log('Generated state:', generatedState);
 console.log('Received state:', receivedState);
+
 ```
 
 **Solutions:**
+
 1. **Store state properly:**
+
 
 ```javascript
 // Store state in session or secure cookie
@@ -238,9 +349,12 @@ const storedState = sessionStorage.getItem('oauth_state');
 if (storedState !== receivedState) {
   throw new Error('State mismatch - potential CSRF attack');
 }
+
 ```
 
+
 2. **Handle state expiration:**
+
 
 ```javascript
 // Add timestamp to state
@@ -252,25 +366,34 @@ const state = JSON.stringify({
 // Verify with timeout
 const parsedState = JSON.parse(storedState);
 const isExpired = Date.now() - parsedState.timestamp > 300000; // 5 minutes
+
 ```
+
 
 #### **Issue 2: Token Exchange Failures**
 
 **Symptoms:**
+
 ```
+
 Error: "invalid_grant: authorization code expired"
+
 ```
 
 **Diagnosis:**
+
 ```javascript
 // Log token exchange details
 console.log('Authorization code:', code);
 console.log('Code length:', code.length);
 console.log('Time since callback:', Date.now() - callbackTime);
+
 ```
 
 **Solutions:**
+
 1. **Implement immediate exchange:**
+
 
 ```javascript
 // Exchange code immediately on callback
@@ -288,9 +411,12 @@ window.addEventListener('load', async () => {
     }
   }
 });
+
 ```
 
+
 2. **Handle expired codes:**
+
 
 ```javascript
 async function exchangeCodeWithRetry(code, maxRetries = 3) {
@@ -306,16 +432,22 @@ async function exchangeCodeWithRetry(code, maxRetries = 3) {
     }
   }
 }
+
 ```
+
 
 #### **Issue 3: CORS and Domain Issues**
 
 **Symptoms:**
+
 ```
+
 CORS error: "Access to fetch blocked by CORS policy"
+
 ```
 
 **Diagnosis:**
+
 ```javascript
 // Check if running on correct domain
 console.log('Current origin:', window.location.origin);
@@ -323,10 +455,13 @@ console.log('Expected origin:', 'https://yourdomain.com');
 
 // Check if HTTPS is enabled
 console.log('Is HTTPS:', window.location.protocol === 'https:');
+
 ```
 
 **Solutions:**
+
 1. **Configure CORS properly:**
+
 
 ```javascript
 // In your NOX API configuration
@@ -341,9 +476,12 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Authorization', 'Content-Type']
 };
+
 ```
 
+
 2. **Handle development environment:**
+
 
 ```javascript
 // Development proxy configuration
@@ -355,15 +493,19 @@ const devProxy = {
     cookieDomainRewrite: 'localhost'
   }
 };
+
 ```
 
+
 ### **Advanced Troubleshooting**
+
 
 #### **Token Refresh Issues**
 
 **Issue:** Refresh tokens not working
 
 **Diagnosis:**
+
 ```javascript
 // Check refresh token validity
 const refreshToken = getStoredRefreshToken();
@@ -374,9 +516,11 @@ console.log('Token format valid:', isValidJWT(refreshToken));
 const decodedToken = decodeJWT(accessToken);
 console.log('Access token expires:', new Date(decodedToken.exp * 1000));
 console.log('Current time:', new Date());
+
 ```
 
 **Solutions:**
+
 ```javascript
 // Implement automatic refresh with retry logic
 class TokenManager {
@@ -428,13 +572,16 @@ class TokenManager {
     this.storeTokens(tokens);
   }
 }
+
 ```
+
 
 #### **Session Management Issues**
 
 **Issue:** Users getting logged out unexpectedly
 
 **Diagnosis:**
+
 ```javascript
 // Monitor session events
 window.addEventListener('storage', (e) => {
@@ -454,9 +601,11 @@ setInterval(() => {
     console.log('Multiple sessions detected');
   }
 }, 1000);
+
 ```
 
 **Solutions:**
+
 ```javascript
 // Implement proper session management
 class SessionManager {
@@ -507,15 +656,20 @@ class SessionManager {
     }, 100);
   }
 }
+
 ```
 
 ---
 
+
 ## 🔒 **SECURITY BEST PRACTICES**
+
 
 ### **Token Security**
 
+
 #### **Secure Token Storage**
+
 
 ```javascript
 // Use httpOnly cookies for sensitive tokens
@@ -543,9 +697,12 @@ class SecureTokenStorage {
     document.cookie = 'refresh_token=; Secure; HttpOnly; SameSite=Strict; Path=/; Max-Age=0';
   }
 }
+
 ```
 
+
 #### **CSRF Protection**
+
 
 ```javascript
 // Generate and validate CSRF tokens
@@ -572,11 +729,15 @@ class CSRFProtection {
     return config;
   }
 }
+
 ```
+
 
 ### **Input Validation**
 
+
 #### **Client-Side Validation**
+
 
 ```javascript
 // Validate OAuth parameters
@@ -606,9 +767,12 @@ function validateOAuthCallback(params) {
 
   return { code, state };
 }
+
 ```
 
+
 #### **Server-Side Validation**
+
 
 ```javascript
 // Validate tokens and claims
@@ -639,15 +803,20 @@ function validateAccessToken(token) {
     throw new AuthenticationError('Invalid token: ' + error.message);
   }
 }
+
 ```
 
 ---
 
+
 ## 🧪 **TESTING AUTHENTICATION**
+
 
 ### **Automated Testing**
 
+
 #### **OAuth Flow Testing**
+
 
 ```javascript
 // Test complete OAuth flow
@@ -686,9 +855,12 @@ describe('OAuth Authentication', () => {
       .rejects.toThrow('ValidationError');
   });
 });
+
 ```
 
+
 #### **Token Management Testing**
+
 
 ```javascript
 // Test token lifecycle
@@ -717,78 +889,122 @@ describe('Token Management', () => {
       .rejects.toThrow('Authentication required');
   });
 });
+
 ```
 
+
 ### **Manual Testing Checklist**
+
 
 #### **OAuth Provider Testing**
 
 **Google OAuth:**
+
 - [ ] Authorization URL redirects correctly
+
 - [ ] User can grant/deny permissions
+
 - [ ] Callback includes authorization code
+
 - [ ] Token exchange returns valid tokens
+
 - [ ] Profile API returns user data
+
 - [ ] Refresh tokens work correctly
 
 **GitHub OAuth:**
+
 - [ ] App authorization screen displays
+
 - [ ] Scope permissions are correct
+
 - [ ] Private email access works (if requested)
+
 - [ ] Organization access works (if applicable)
 
 **Microsoft OAuth:**
+
 - [ ] Microsoft login screen displays
+
 - [ ] Both personal and work accounts work
+
 - [ ] Multi-factor authentication flows work
+
 - [ ] Tenant-specific login works
+
 
 #### **Security Testing**
 
 **CSRF Protection:**
+
 - [ ] State parameter generated and validated
+
 - [ ] Invalid state parameter rejected
+
 - [ ] Cross-origin requests blocked
+
 - [ ] Session fixation prevented
 
 **Token Security:**
+
 - [ ] Tokens stored securely
+
 - [ ] Expired tokens handled properly
+
 - [ ] Token revocation works
+
 - [ ] Multiple session handling
 
 ---
 
+
 ## 🚨 **EMERGENCY PROCEDURES**
 
+
 ### **Security Incidents**
+
 
 #### **Compromised OAuth App**
 
 **Immediate Actions:**
+
 1. **Revoke OAuth credentials:**
 
+
 ```bash
+
 # Disable OAuth app in provider console
+
 # Google: Cloud Console → Credentials
+
 # GitHub: Settings → Developer settings → OAuth Apps
+
 # Microsoft: Azure Portal → App registrations
+
 ```
+
 
 2. **Update application credentials:**
 
+
 ```bash
+
 # Generate new client secret
+
 # Update environment variables
 export GOOGLE_CLIENT_SECRET="new-secret"
 export GITHUB_CLIENT_SECRET="new-secret"
 export MICROSOFT_CLIENT_SECRET="new-secret"
 
+
 # Restart application
 sudo systemctl restart nox-api
+
 ```
 
+
 3. **Force user re-authentication:**
+
 
 ```javascript
 // Invalidate all sessions
@@ -802,11 +1018,14 @@ await sendSecurityNotification({
   subject: 'Security Update - Please Log In Again',
   message: 'For security reasons, please log in again to your account.'
 });
+
 ```
+
 
 #### **Token Leakage**
 
 **Detection:**
+
 ```javascript
 // Monitor for suspicious token usage
 function detectAnomalousActivity(token, request) {
@@ -821,9 +1040,11 @@ function detectAnomalousActivity(token, request) {
     triggerSecurityAlert(token, analysis);
   }
 }
+
 ```
 
 **Response:**
+
 ```javascript
 // Immediate token revocation
 async function handleTokenLeakage(suspiciousTokens) {
@@ -844,13 +1065,17 @@ async function handleTokenLeakage(suspiciousTokens) {
     });
   }
 }
+
 ```
 
+
 ### **Service Recovery**
+
 
 #### **OAuth Provider Outage**
 
 **Fallback Strategy:**
+
 ```javascript
 // Implement provider fallback
 class MultiProviderAuth {
@@ -896,11 +1121,14 @@ class MultiProviderAuth {
     throw new Error('No authentication providers available');
   }
 }
+
 ```
+
 
 #### **Database Connection Issues**
 
 **Session Recovery:**
+
 ```javascript
 // Implement session persistence fallback
 class SessionFallback {
@@ -943,11 +1171,14 @@ class SessionFallback {
     return null;
   }
 }
+
 ```
 
 ---
 
+
 ## 📞 **SUPPORT CONTACTS**
+
 
 ### **Getting Help**
 
@@ -961,6 +1192,7 @@ class SessionFallback {
 - **Google:** https://developers.google.com/identity/protocols/oauth2
 - **GitHub:** https://docs.github.com/en/developers/apps/building-oauth-apps
 - **Microsoft:** https://docs.microsoft.com/en-us/azure/active-directory/develop/
+
 
 ### **Escalation Procedures**
 
@@ -987,25 +1219,39 @@ class SessionFallback {
 
 ---
 
+
 ## 📚 **ADDITIONAL RESOURCES**
+
 
 ### **OAuth2 Specification References**
 
+
 - [RFC 6749 - OAuth 2.0 Authorization Framework](https://tools.ietf.org/html/rfc6749)
+
 - [RFC 6750 - Bearer Token Usage](https://tools.ietf.org/html/rfc6750)
+
 - [RFC 7636 - PKCE](https://tools.ietf.org/html/rfc7636)
+
 - [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html)
+
 
 ### **Security Guidelines**
 
+
 - [OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
+
 - [OAuth 2.0 Security Best Practices](https://tools.ietf.org/html/draft-ietf-oauth-security-topics)
+
 - [NIST Digital Identity Guidelines](https://pages.nist.gov/800-63-3/)
+
 
 ### **Testing Tools**
 
+
 - [OAuth 2.0 Debugger](https://oauthdebugger.com/)
+
 - [JWT.io Debugger](https://jwt.io/)
+
 - [Postman OAuth 2.0 Testing](https://learning.postman.com/docs/sending-requests/authorization/#oauth-20)
 
 ---

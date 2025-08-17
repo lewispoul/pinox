@@ -4,9 +4,7 @@
 **Analyste**: GitHub Copilot  
 **Workspace**: `/home/lppoulin/nox-api-src`
 
----
-
-## 🎯 **RÉSUMÉ EXÉCUTIF**
+---# 🎯 **RÉSUMÉ EXÉCUTIF**
 
 Le projet NOX API est un système complexe et mature comprenant :
 - **Une API FastAPI sophistiquée** avec authentification OAuth2, audit, quotas et IA

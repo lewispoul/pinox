@@ -1,170 +1,104 @@
-# Makefile for Nox API - Simple automation
-# Conforme à COPILOT_PLAN.md - Étapes 2, 4, 5
+# Makefile for Nox API XTB Integration
+# Development and deployment automation
 
-.PHONY: help install harden caddy-lan caddy-public nginx-public repair repair-v2 validate test demo logs install-logs debug clean
+.PHONY: run worker test redis help clean status logs
+
+# Development targets for XTB API
+run:  ## Run API server on port 8080
+	PYTHONPATH=. python -m uvicorn api.main:app --reload --port 8080
+
+worker:  ## Run Dramatiq worker for background jobs
+	python -m dramatiq api.routes.jobs --processes 1 --threads 1
+
+test:  ## Run pytest test suite
+	PYTHONPATH=. python -m pytest -q
+
+redis:  ## Start Redis server in daemon mode
+	@echo "Starting Redis server..."
+	@if command -v redis-server >/dev/null 2>&1; then \
+		redis-server --daemonize yes; \
+		echo "Redis started as daemon"; \
+	else \
+		echo "Redis not installed locally, starting with Docker..."; \
+		docker compose -f docker-compose.xtb.yml up -d redis; \
+	fi
+
+# Legacy targets preserved
+.PHONY: help install harden caddy-lan caddy-public nginx-public repair repair-v2 validate demo logs install-logs debug
 
 # Configuration
 SCRIPT_DIR = nox-api/scripts
 DEPLOY_DIR = nox-api/deploy
 TESTS_DIR = nox-api/tests
 
-help:  ## Afficher cette aide
-	@echo "Makefile Nox API - Commandes disponibles:"
+help:  ## Display available commands
+	@echo "Makefile Nox API XTB - Available commands:"
 	@echo ""
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
+	@echo "🚀 XTB Development:"
+	@echo "  make run           # Start API server (port 8080)"
+	@echo "  make worker        # Start Dramatiq worker"
+	@echo "  make test          # Run pytest test suite"
+	@echo "  make redis         # Start Redis daemon"
 	@echo ""
-	@echo "Exemples:"
-	@echo "  make install       # Installation complète"
-	@echo "  make harden        # Durcissement sécurisé"
-	@echo "  make caddy-lan     # Reverse proxy Caddy (LAN)"
-	@echo "  make caddy-public DOMAIN=api.example.com EMAIL=admin@example.com"
-	@echo "  make nginx-public DOMAIN=api.example.com EMAIL=admin@example.com"
-	@echo "  make repair        # Réparation/maintenance"
-	@echo "  make demo          # Tests automatiques avec client Python"
-	@echo "  make logs          # Afficher les logs récents"
-	@echo "  make install-logs  # Installer système de logs et rotation (Étape 6)"
-	@echo "  make debug         # Diagnostic rapide avec nox-debug"
-	@echo "  make test          # Tests API"
+	@echo "📊 System:"
+	@echo "  make status        # Show service status"
+	@echo "  make logs          # Show recent logs"  
+	@echo "  make clean         # Clean temporary files"
+	@echo ""
+	@echo "⚙️  Legacy (for existing NOX infrastructure):"
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | grep -v "XTB\|Display\|Start\|Run\|Show\|Clean" | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-15s %s\n", $$1, $$2}'
+	@echo ""
+	@echo "💡 Quick start:"
+	@echo "  Terminal 1: make redis && make run"
+	@echo "  Terminal 2: make worker"
+	@echo "  Terminal 3: make test"
 
-install:  ## Installer/réinstaller Nox API
-	@echo "Installation de Nox API..."
-	@./$(DEPLOY_DIR)/install_nox.sh
+status:  ## Show XTB API and service status
+	@echo "=== XTB API Status ==="
+	@echo "API Health: $$(curl -s http://127.0.0.1:8080/health 2>/dev/null | grep -o '"status":"ok"' | grep -o 'ok' || echo 'not available')"
+	@echo "Redis: $$(redis-cli ping 2>/dev/null || echo 'not available')"
+	@echo "XTB Binary: $$(which xtb 2>/dev/null || echo 'not found in PATH')"
+	@if pgrep -f "uvicorn.*api.main" > /dev/null; then echo "API Server: running"; else echo "API Server: not running"; fi
+	@if pgrep -f "dramatiq.*api.routes.jobs" > /dev/null; then echo "Dramatiq Worker: running"; else echo "Dramatiq Worker: not running"; fi
 
-harden:  ## Durcissement sécurisé (Étape 3) - Migration venv vers /opt/nox
-	@echo "Durcissement de Nox API..."
-	@sudo ./$(DEPLOY_DIR)/harden_nox.sh
-
-caddy-lan:  ## Installer Caddy en mode LAN (HTTP port 80)
-	@echo "Configuration Caddy mode LAN..."
-	@sudo ./$(DEPLOY_DIR)/caddy_setup.sh lan
-
-caddy-public:  ## Installer Caddy en mode PUBLIC avec HTTPS - Usage: make caddy-public DOMAIN=example.com EMAIL=admin@example.com
-	@echo "Configuration Caddy mode PUBLIC..."
-	@if [ -z "$(DOMAIN)" ] || [ -z "$(EMAIL)" ]; then \
-		echo "Usage: make caddy-public DOMAIN=votre-domaine.tld EMAIL=votre-email@example.com"; \
-		exit 1; \
-	fi
-	@sudo ./$(DEPLOY_DIR)/caddy_setup.sh public $(DOMAIN) $(EMAIL)
-
-nginx-public:  ## Installer Nginx en mode PUBLIC avec HTTPS - Usage: make nginx-public DOMAIN=example.com EMAIL=admin@example.com
-	@echo "Configuration Nginx mode PUBLIC..."
-	@if [ -z "$(DOMAIN)" ] || [ -z "$(EMAIL)" ]; then \
-		echo "Usage: make nginx-public DOMAIN=votre-domaine.tld EMAIL=votre-email@example.com"; \
-		exit 1; \
-	fi
-	@sudo ./$(DEPLOY_DIR)/nginx_setup.sh $(DOMAIN) $(EMAIL)
-
-repair:  ## Réparer et maintenir l'installation Nox API
-	@echo "Réparation de Nox API..."
-	@./$(SCRIPT_DIR)/nox_repair.sh
-
-repair-v2:  ## Réparer avec script robuste (sans hang)
-	@echo "Réparation de Nox API (version robuste)..."
-	@./$(SCRIPT_DIR)/nox_repair_v2.sh
-
-validate:  ## Valider l'installation actuelle
-	@echo "Validation de Nox API..."
-	@./validate_nox.sh
-
-demo:  ## Exécuter les tests automatiques avec le client Python (Étape 5)
-	@echo "Lancement des tests demo avec client Python..."
-	@if [ -f "/etc/default/nox-api" ]; then \
-		export NOX_API_TOKEN=$$(sudo grep "^NOX_API_TOKEN=" /etc/default/nox-api | cut -d= -f2 | tr -d '"'); \
-		export NOX_API_URL="http://localhost"; \
-		echo "🚀 Configuration détectée:"; \
-		echo "   API URL: $$NOX_API_URL"; \
-		echo "   Token: $$(echo $$NOX_API_TOKEN | cut -c1-8)..."; \
-		echo ""; \
-		cd clients && python3 tests_demo.py; \
-	else \
-		echo "❌ Erreur: Configuration /etc/default/nox-api non trouvée."; \
-		echo "💡 Exécutez 'make install' d'abord pour installer Nox API."; \
-		exit 1; \
-	fi
-
-logs:  ## Afficher les logs récents du service
-	@echo "=== Logs Nox API ==="
-	@if [ -d "/var/log/nox-api" ]; then \
-		echo "Logs dédiés disponibles:"; \
-		sudo tail -20 /var/log/nox-api/nox-api.log 2>/dev/null || echo "Pas de logs applicatifs"; \
-	else \
-		echo "Logs systemd (pas de logs dédiés):"; \
-		sudo journalctl -u nox-api -n 30 --no-pager 2>/dev/null || echo "Service non installé"; \
-	fi
-
-install-logs:  ## Installer le système de logs dédiés et rotation (Étape 6)
-	@echo "Installation du système de logs et rotation..."
-	@sudo ./$(DEPLOY_DIR)/install_logging.sh
-
-debug:  ## Diagnostic rapide du système Nox API
-	@echo "Diagnostic Nox API..."
-	@if command -v nox-debug >/dev/null 2>&1; then \
-		nox-debug; \
-	else \
-		echo "❌ Outil nox-debug non installé. Exécutez 'make logs' d'abord."; \
-		echo "💡 Alternative: sudo journalctl -u nox-api -n 20"; \
-		exit 1; \
-	fi
-
-test:  ## Exécuter les tests de l'API
-	@echo "Tests de l'API Nox..."
-	@if [ -f "/etc/default/nox-api" ]; then \
-		TOKEN=$$(sudo grep "^NOX_API_TOKEN=" /etc/default/nox-api | cut -d= -f2); \
-		./$(TESTS_DIR)/run_all_tests.sh "$$TOKEN"; \
-	else \
-		echo "Erreur: Configuration non trouvée. Exécutez 'make install' d'abord."; \
-		exit 1; \
-	fi
-
-clean:  ## Nettoyer les fichiers temporaires
-	@echo "Nettoyage des fichiers temporaires..."
+clean:  ## Clean temporary files and cache
+	@echo "Cleaning temporary files..."
 	@find . -name "*.pyc" -delete 2>/dev/null || true
 	@find . -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 	@find . -name "*.tmp" -delete 2>/dev/null || true
-	@echo "Nettoyage terminé"
+	@find . -name "test_*_output" -type d -exec rm -rf {} + 2>/dev/null || true
+	@echo "Cleanup completed"
 
-status:  ## Afficher le statut du service Nox API
-	@echo "=== Statut Nox API ==="
-	@echo "Service: $$(systemctl is-active nox-api 2>/dev/null || echo 'non installé')"
-	@echo "API: $$(curl -s http://127.0.0.1:8080/health 2>/dev/null | grep -o 'ok' || echo 'non disponible')"
-	@if [ -f "/etc/default/nox-api" ]; then \
-		echo "Configuration: présente"; \
+logs:  ## Show recent logs
+	@echo "=== Recent System Logs ==="
+	@if [ -f "/var/log/nox-api/nox-api.log" ]; then \
+		tail -20 /var/log/nox-api/nox-api.log; \
 	else \
-		echo "Configuration: absente"; \
+		echo "No XTB API specific logs found"; \
 	fi
 
-logs:  ## Afficher les logs récents du service
-	@echo "=== Logs Nox API ==="
-	@sudo journalctl -u nox-api -n 30 --no-pager 2>/dev/null || echo "Service non installé"
+# Legacy NOX infrastructure targets (preserved for compatibility)
+install:  ## Install/reinstall legacy Nox API
+	@echo "Installing legacy Nox API..."
+	@./$(DEPLOY_DIR)/install_nox.sh
 
-# Cibles de développement
-dev-test:  ## Tests de développement (sans authentification complète)
-	@echo "Tests de développement..."
-	@curl -s http://127.0.0.1:8080/health && echo " - Health OK" || echo " - Health FAIL"
+repair:  ## Repair legacy installation
+	@echo "Repairing legacy Nox API..."
+	@./$(SCRIPT_DIR)/nox_repair.sh
 
-# Installation des outils CLI (Étape 7)
-install-tools:  ## Installer les outils de ligne de commande (noxctl + complétion)
-	@echo "Installation des outils CLI Nox API..."
-	@if [ ! -f "scripts/noxctl" ]; then \
-		echo "❌ Erreur: scripts/noxctl non trouvé"; \
-		exit 1; \
+validate:  ## Validate legacy installation
+	@echo "Validating legacy Nox API..."
+	@./validate_nox.sh
+
+demo:  ## Run legacy demo tests
+	@echo "Running legacy demo tests..."
+	@if [ -f "/etc/default/nox-api" ]; then \
+		export NOX_API_TOKEN=$$(sudo grep "^NOX_API_TOKEN=" /etc/default/nox-api | cut -d= -f2 | tr -d '"'); \
+		export NOX_API_URL="http://localhost"; \
+		cd clients && python3 tests_demo.py; \
+	else \
+		echo "❌ Error: Legacy configuration not found"; \
 	fi
-	@echo "📦 Installation de noxctl vers /usr/local/bin/"
-	@sudo cp scripts/noxctl /usr/local/bin/
-	@sudo chmod +x /usr/local/bin/noxctl
-	@echo "📦 Installation de la complétion bash..."
-	@sudo cp scripts/noxctl-completion.bash /etc/bash_completion.d/
-	@echo "🎯 Installation terminée!"
-	@echo ""
-	@echo "✅ noxctl installé: $(shell which noxctl 2>/dev/null || echo '/usr/local/bin/noxctl')"
-	@echo "✅ Complétion bash: /etc/bash_completion.d/noxctl-completion.bash"
-	@echo ""
-	@echo "💡 Utilisation:"
-	@echo "   source /etc/bash_completion.d/noxctl-completion.bash  # ou relancer bash"
-	@echo "   noxctl help                                            # afficher l'aide"
-	@echo "   noxctl health                                         # test API"
 
-# Cible par défaut
-all: install validate  ## Installation complète + validation
-
+# Default target
 .DEFAULT_GOAL := help

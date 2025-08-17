@@ -1,0 +1,26 @@
+# Docker Compose - XTB API Development
+# Minimal Redis setup for Dramatiq queue
+version: '3.8'
+
+services:
+  # ===== REDIS FOR DRAMATIQ =====
+  redis:
+    image: redis:7-alpine
+    container_name: xtb-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+# ===== VOLUMES =====
+volumes:
+  redis_data:
+    driver: local
+    name: xtb-redis-data

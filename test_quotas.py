@@ -7,6 +7,9 @@ import uuid
 from quotas.database import QuotaDatabase
 from quotas.models import UserQuota, UserUsage
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_quota_system():
     """Test basic quota operations"""
     print("🧪 Testing quota system...")

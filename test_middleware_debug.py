@@ -9,6 +9,9 @@ os.environ["NOX_QUOTAS_ENABLED"] = "1"
 from quotas.database import QuotaDatabase
 from quotas.middleware import QuotaEnforcementMiddleware
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_quota_check():
     print("🔍 Testing Quota Enforcement Middleware")
     

@@ -29,19 +29,18 @@ async def test_jobs_flow():
         assert resp.status_code == 200
         job = resp.json()
         assert "job_id" in job
-        assert job["state"] == "completed"
+        assert job["state"] == "pending"  # Job is now queued with Dramatiq
         job_id = job["job_id"]
 
         # 2. GET /jobs/{job_id}
         resp2 = await ac.get(f"/jobs/{job_id}")
         assert resp2.status_code == 200
         job2 = resp2.json()
-        assert job2["state"] == "completed"
+        assert job2["state"] == "pending"  # Job remains pending until Dramatiq worker processes it
         assert job2["job_id"] == job_id
 
-        # 3. GET /jobs/{job_id}/artifacts
+        # 3. GET /jobs/{job_id}/artifacts - Should return 404 for pending jobs
         resp3 = await ac.get(f"/jobs/{job_id}/artifacts")
-        assert resp3.status_code == 200
+        assert resp3.status_code == 404  # No artifacts for pending jobs
         result = resp3.json()
-        assert "scalars" in result
-        assert "E_total_hartree" in result["scalars"]
+        assert result["detail"] == "Result not available"  # Expected error message

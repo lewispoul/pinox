@@ -1,62 +1,60 @@
 import uuid
-import dramatiq
 from fastapi import APIRouter, HTTPException
 from api.schemas.job import JobRequest, JobStatus
-from api.schemas.result import ResultBundle
-from api.services.queue import broker  # Import broker
+from api.schemas.result import ResultBundle, Artifact
 from api.services.storage import job_dir
+from api.services.queue import broker  # noqa: F401
+import dramatiq
 from ai.runners.xtb import run_xtb_job
-import json
-from pathlib import Path
 
 router = APIRouter()
-JOBS = {}
+JOBS = {}  # { job_id: {"state": str, "message": str, "result": dict|None} }
 
 @dramatiq.actor
-def process_xtb_job(job_id: str, req_dict: dict):
-    """Actor Dramatiq pour traiter les jobs XTB en arrière-plan"""
+def run_job(job_id: str, req_json: str):
+    """Dramatiq actor to execute XTB calculations"""
     try:
-        JOBS[job_id] = {"state": "running", "message": "XTB calculation in progress", "result": None}
+        JR = JobRequest.model_validate_json(req_json)
+        JOBS[job_id]["state"] = "running"
+        JOBS[job_id]["message"] = "XTB calculation in progress"
         
-        # Récupérer les paramètres
-        inputs = req_dict["inputs"]
-        xyz = inputs["xyz"]
-        charge = inputs.get("charge", 0)
-        multiplicity = inputs.get("multiplicity", 1)
-        params = inputs.get("params", {})
+        jd = job_dir(job_id)
+        result = run_xtb_job(
+            jd,
+            JR.inputs.xyz,
+            JR.inputs.charge,
+            JR.inputs.multiplicity,
+            JR.inputs.params.model_dump(),
+        )
         
-        # Dossier de job
-        job_folder = job_dir(job_id)
+        # Store result and update state
+        JOBS[job_id]["result"] = result
+        # XTB success: return code 0 OR (return code 2 with valid energy results)
+        has_energy = result.get("scalars", {}).get("E_total_hartree") is not None
+        success = (result.get("returncode") == 0) or (result.get("returncode") == 2 and has_energy)
         
-        # Exécuter XTB
-        result = run_xtb_job(job_folder, xyz, charge, multiplicity, params)
-        
-        # Stocker le résultat
-        JOBS[job_id] = {
-            "state": "completed" if result.get("returncode") == 0 else "failed",
-            "message": "XTB calculation completed" if result.get("returncode") == 0 else "XTB calculation failed",
-            "result": {
-                "scalars": result.get("scalars", {}),
-                "series": result.get("series", {}),
-                "artifacts": result.get("artifacts", [])
-            }
-        }
-        
+        if success:
+            JOBS[job_id]["state"] = "completed"
+            JOBS[job_id]["message"] = "XTB calculation completed successfully"
+        else:
+            JOBS[job_id]["state"] = "failed"  
+            JOBS[job_id]["message"] = f"XTB calculation failed with return code {result.get('returncode')}"
+            
     except Exception as e:
-        JOBS[job_id] = {"state": "failed", "message": f"Error: {str(e)}", "result": None}
+        JOBS[job_id]["state"] = "failed"
+        JOBS[job_id]["message"] = str(e)
 
 @router.post("/jobs", response_model=JobStatus)
 def create_job(req: JobRequest):
+    """Create a new XTB job and queue it for processing"""
     job_id = uuid.uuid4().hex
     JOBS[job_id] = {"state": "pending", "message": "Job queued for processing", "result": None}
-    
-    # Envoyer à la queue Dramatiq
-    process_xtb_job.send(job_id, req.model_dump())
-    
+    run_job.send(job_id, req.model_dump_json())
     return JobStatus(job_id=job_id, state="pending", message="Job queued for processing")
 
 @router.get("/jobs/{job_id}", response_model=JobStatus)
 def get_job(job_id: str):
+    """Get job status and current state"""
     j = JOBS.get(job_id)
     if not j:
         raise HTTPException(404, "Job not found")
@@ -64,8 +62,20 @@ def get_job(job_id: str):
 
 @router.get("/jobs/{job_id}/artifacts", response_model=ResultBundle)
 def get_artifacts(job_id: str):
+    """Get job results and artifacts if calculation is completed"""
     j = JOBS.get(job_id)
-    if not j or j["state"] != "completed":
+    if not j or j["state"] != "completed" or j["result"] is None:
         raise HTTPException(404, "Result not available")
+    
     rb = j["result"]
-    return ResultBundle(**rb)
+    
+    # Convert dict artifacts to Artifact objects for proper validation
+    artifacts = []
+    for art_dict in rb.get("artifacts", []):
+        artifacts.append(Artifact(**art_dict))
+    
+    return ResultBundle(
+        scalars=rb.get("scalars", {}), 
+        series=rb.get("series", {}), 
+        artifacts=artifacts
+    )

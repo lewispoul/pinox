@@ -1,16 +1,17 @@
 import json
+import shutil
 import subprocess
 import shlex
+import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
+
 from api.services.settings import settings
 
-def write_xyz(xyz_text: str, path: Path):
-    """Write XYZ coordinates to file"""
+def _write_xyz(xyz_text: str, path: Path) -> None:
     path.write_text(xyz_text.strip() + "\n", encoding="utf-8")
 
-def run_cmd(cmd: str, cwd: Path, log_path: Path):
-    """Run shell command and log output"""
+def _run_cmd(cmd: str, cwd: Path, log_path: Path) -> int:
     with log_path.open("w", encoding="utf-8") as logf:
         proc = subprocess.Popen(
             shlex.split(cmd),
@@ -22,119 +23,171 @@ def run_cmd(cmd: str, cwd: Path, log_path: Path):
         ret = proc.wait()
     return ret
 
-def parse_xtb_json(json_data: dict) -> Dict[str, float]:
-    """Parser amélioré pour extraire les scalaires depuis xtbout.json"""
-    scalars = {}
-    try:
-        # Énergie totale
-        if "total energy" in json_data:
-            scalars["E_total_hartree"] = float(json_data["total energy"])
-        elif "energy" in json_data:
-            scalars["E_total_hartree"] = float(json_data["energy"])
-            
-        # Gap HOMO-LUMO
-        if "gap" in json_data:
-            scalars["gap_eV"] = float(json_data["gap"])
-        elif "HOMO-LUMO gap" in json_data:
-            scalars["gap_eV"] = float(json_data["HOMO-LUMO gap"])
-            
-        # Moment dipolaire
-        if "dipole moment" in json_data:
-            scalars["dipole_D"] = float(json_data["dipole moment"])
-        elif "dipole" in json_data:
-            scalars["dipole_D"] = float(json_data["dipole"])
-            
-        # Autres propriétés utiles
-        if "total charge" in json_data:
-            scalars["total_charge"] = float(json_data["total charge"])
-        if "molecular mass" in json_data:
-            scalars["molecular_mass_u"] = float(json_data["molecular mass"])
-            
-    except (KeyError, ValueError, TypeError) as e:
-        print(f"Warning: Error parsing XTB JSON: {e}")
-    return scalars
-
-def parse_xtb_simple(out_text: str) -> Dict[str, float]:
-    """Parser simple pour extraire l'énergie depuis la sortie texte"""
+def _parse_xtbout_json(json_path: Path) -> Dict[str, float]:
     scalars: Dict[str, float] = {}
-    lines = out_text.split('\n')
-    for line in lines:
-        if "TOTAL ENERGY" in line.upper():
-            try:
-                # Recherche pattern typique: | TOTAL ENERGY    -4.123456 Eh
-                parts = line.split()
-                for i, part in enumerate(parts):
-                    if "ENERGY" in part.upper() and i + 1 < len(parts):
-                        try:
-                            energy = float(parts[i + 1])
-                            scalars["E_total_hartree"] = energy
-                            break
-                        except ValueError:
-                            continue
-            except:
-                pass
+    try:
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+    except Exception:
+        return scalars
+
+    # énergie totale, plusieurs variantes possibles
+    # essayer chemins connus, sinon rien
+    candidates_E = [
+        ("energy", "total"),
+        ("results", "total_energy"),
+        ("scf", "etot"),
+        ("etot",),
+    ]
+    for path in candidates_E:
+        node = data
+        try:
+            for k in path:
+                node = node[k]
+            if isinstance(node, (int, float, str)):
+                scalars["E_total_hartree"] = float(node)
+                break
+        except Exception:
+            continue
+
+    # gap eV
+    candidates_gap = [
+        ("gap",),
+        ("results", "gap"),
+        ("orbitals", "gap"),
+    ]
+    for path in candidates_gap:
+        node = data
+        try:
+            for k in path:
+                node = node[k]
+            if isinstance(node, (int, float, str)):
+                scalars["gap_eV"] = float(node)
+                break
+        except Exception:
+            continue
+
+    # dipôle total en Debye
+    candidates_dip = [
+        ("dipole", "total"),
+        ("properties", "dipole", "total"),
+    ]
+    for path in candidates_dip:
+        node = data
+        try:
+            for k in path:
+                node = node[k]
+            if isinstance(node, (int, float, str)):
+                scalars["dipole_D"] = float(node)
+                break
+        except Exception:
+            continue
+
     return scalars
 
-def run_xtb_job(job_dir: Path, xyz: str, charge: int, multiplicity: int, params: dict) -> Dict[str, Any]:
-    """Exécute un calcul XTB et retourne les résultats"""
+def _parse_from_text(text: str) -> Dict[str, float]:
+    scalars: Dict[str, float] = {}
+    # Energie totale, lignes type: "TOTAL ENERGY  -40.123456 Hartree"
+    m = re.search(r"TOTAL\s+ENERGY\s+(-?\d+\.\d+)", text, re.IGNORECASE)
+    if m:
+        try:
+            scalars["E_total_hartree"] = float(m.group(1))
+        except Exception:
+            pass
+    # GAP, lignes type: "HOMO-LUMO GAP  5.43 eV"
+    m = re.search(r"HOMO[-\s]?LUMO\s+GAP\s+(\d+\.\d+)", text, re.IGNORECASE)
+    if m:
+        try:
+            scalars["gap_eV"] = float(m.group(1))
+        except Exception:
+            pass
+    # Dipôle total, lignes type: "dipole moment  total:   1.234 Debye"
+    m = re.search(r"dipole\s+moment.*total[:\s]+(\d+\.\d+)", text, re.IGNORECASE)
+    if m:
+        try:
+            scalars["dipole_D"] = float(m.group(1))
+        except Exception:
+            pass
+    return scalars
+
+def _maybe_generate_molden(work: Path, inp_name: str) -> Path:
+    """Essaye de produire un fichier Molden pour les MOs, utile pour générer des cubes plus tard.
+    Plusieurs binaires xtb supportent l'option --molden, selon version. On essaie sans casser le job."""
+    molden = work / "orbitals.molden"
+    cmd = f'{settings.xtb_bin} {inp_name} --molden'
+    try:
+        ret = _run_cmd(cmd, work, work / "molden.log")
+        if ret == 0 and molden.exists() and molden.stat().st_size > 0:
+            return molden
+    except Exception:
+        pass
+    return Path()
+
+def run_xtb_job(job_dir: Path, xyz: str, charge: int, multiplicity: int, params: Dict[str, Any]) -> Dict[str, Any]:
+    job_dir.mkdir(parents=True, exist_ok=True)
     inp = job_dir / "input.xyz"
-    write_xyz(xyz, inp)
+    _write_xyz(xyz, inp)
+
     log = job_dir / "xtb.log"
+    out = job_dir / "xtb.out"          # certaines versions écrivent aussi xtb.out
     json_out = job_dir / "xtbout.json"
 
+    # commande XTB
     gfn = int(params.get("gfn", 2))
-    base_cmd = f"{settings.xtb_bin} {inp.name} --gfn {gfn}"
+    cmd = f'{settings.xtb_bin} {inp.name} --gfn {gfn} --json'
     if params.get("opt", True):
-        base_cmd += " --opt"
+        cmd += " --opt"
     if params.get("hess", False):
-        base_cmd += " --hess"
+        cmd += " --hess"
     if params.get("uhf", False):
-        base_cmd += " --uhf"
+        cmd += " --uhf"
+    # charge, si différent de valeur par défaut
     chrg = int(params.get("chrg", charge))
     if chrg != 0:
-        base_cmd += f" --chrg {chrg}"
-    if params.get("json_output", True):
-        base_cmd += " --json"
+        cmd += f" --chrg {chrg}"
 
-    ret = run_cmd(base_cmd, job_dir, log)
+    # exécuter
+    ret = _run_cmd(cmd, job_dir, log)
 
-    scalars = {}
-    
-    # Priorité au JSON si disponible
+    scalars: Dict[str, float] = {}
+    artifacts: List[Dict[str, Any]] = []
+
+    # parse prioritaire du JSON
     if json_out.exists():
-        try:
-            j = json.loads(json_out.read_text(encoding="utf-8"))
-            scalars = parse_xtb_json(j)
-        except Exception as e:
-            print(f"Warning: Failed to parse XTB JSON: {e}")
-    
-    # Fallback sur la sortie texte
-    if not scalars and log.exists():
-        try:
-            log_text = log.read_text(encoding="utf-8")
-            scalars = parse_xtb_simple(log_text)
-        except Exception as e:
-            print(f"Warning: Failed to parse XTB log: {e}")
+        scalars.update(_parse_xtbout_json(json_out))
+        artifacts.append({"name": "xtbout.json", "path": str(json_out), "mime": "application/json", "size": json_out.stat().st_size})
 
-    artifacts = []
-    if json_out.exists():
-        artifacts.append({
-            "name": "xtbout.json", 
-            "path": str(json_out), 
-            "mime": "application/json", 
-            "size": json_out.stat().st_size
-        })
-    if log.exists():
-        artifacts.append({
-            "name": "xtb.log", 
-            "path": str(log), 
-            "mime": "text/plain", 
-            "size": log.stat().st_size
-        })
+    # fallback parsing texte
+    text = ""
+    if out.exists() and out.is_file():
+        try:
+            text = out.read_text(encoding="utf-8", errors="ignore")
+            artifacts.append({"name": "xtb.out", "path": str(out), "mime": "text/plain", "size": out.stat().st_size})
+        except Exception:
+            text = ""
+    if not text and log.exists():
+        try:
+            text = log.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            text = ""
+    if text:
+        parsed = _parse_from_text(text)
+        for k, v in parsed.items():
+            scalars.setdefault(k, v)
 
-    return {
-        "scalars": scalars, 
-        "series": {}, 
-        "artifacts": artifacts, 
-        "returncode": ret
-    }
+    # logs en artefacts (seulement si pas déjà ajouté et si existe)
+    if log.exists() and not any(a["name"] == "xtb.log" for a in artifacts):
+        artifacts.append({"name": "xtb.log", "path": str(log), "mime": "text/plain", "size": log.stat().st_size})
+
+    # génération Molden si demandé
+    if params.get("cubes", False):
+        molden_path = _maybe_generate_molden(job_dir, inp.name)
+        if molden_path and molden_path.exists() and molden_path.is_file():
+            artifacts.append({"name": molden_path.name, "path": str(molden_path), "mime": "text/plain", "size": molden_path.stat().st_size})
+        else:
+            # XTB peut générer molden.input automatiquement
+            molden_input = job_dir / "molden.input"
+            if molden_input.exists():
+                artifacts.append({"name": "molden.input", "path": str(molden_input), "mime": "text/plain", "size": molden_input.stat().st_size})
+        # TODO futur, conversion molden -> homo.cube et lumo.cube avec un outil externe
+
+    return {"scalars": scalars, "series": {}, "artifacts": artifacts, "returncode": ret}

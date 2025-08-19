@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Tuple
 PROMPT_TEMPLATE = textwrap.dedent("""\
 System: You are the Nox Planner. Output ONLY compact JSON with keys:
 - rationale: short reasoning
-- changes: list of objects {path, action, content}. action ∈ {"create_or_update","delete"}.
+- changes: list of objects {{path, action, content}}. action ∈ {{"create_or_update","delete"}}.
 - tests_to_add: list of test file paths
 - commands_to_run: list of shell commands (pytest etc.)
 - risks: short bullet list

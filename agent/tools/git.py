@@ -6,7 +6,11 @@ def sh(cmd: str) -> str:
     return subprocess.check_output(cmd, shell=True, text=True).strip()
 
 def create_branch(branch: str) -> None:
-    sh(f"git checkout -b {branch}")
+    try:
+        sh(f"git checkout -b {branch}")
+    except subprocess.CalledProcessError:
+        # Branch already exists, just switch to it
+        sh(f"git checkout {branch}")
 
 def commit_all(msg: str) -> None:
     sh('git add -A')

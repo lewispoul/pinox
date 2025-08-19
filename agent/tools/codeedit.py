@@ -17,7 +17,29 @@ def only_in_allowed_paths(patch_text: str, allowlist: Iterable[str]=()) -> bool:
         if line.startswith(("+++ ", "--- ")):
             path = line.split("\t")[0].split(" ", 1)[1].strip()
             if path.startswith(("a/", "b/")): path = path[2:]
-            touched.add(path)
+            # Skip /dev/null which appears for new files
+            if path != "/dev/null":
+                touched.add(path)
     if not allowlist:
         return True
     return all(any(p.startswith(prefix.rstrip("*").rstrip("/")) for prefix in allowlist) for p in touched)
+
+def count_added_lines(patch_text: str) -> int:
+    """Count the number of lines added in a unified diff (excluding +++ headers)."""
+    return sum(1 for line in patch_text.splitlines() 
+               if line.startswith("+") and not line.startswith("+++"))
+
+def ensure_directories_for_new_files(patch_text: str) -> None:
+    """Create directories for any new files in the patch."""
+    import pathlib
+    for line in patch_text.splitlines():
+        if line.startswith("new file mode"):
+            # Look for the next +++ line to get the file path
+            continue
+        if line.startswith("+++ ") and "/dev/null" not in line:
+            path = line.split("\t")[0].split(" ", 1)[1].strip()
+            if path.startswith("b/"):
+                path = path[2:]
+            file_path = pathlib.Path(path)
+            if not file_path.exists():
+                file_path.parent.mkdir(parents=True, exist_ok=True)

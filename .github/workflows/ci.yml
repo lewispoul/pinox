@@ -60,7 +60,12 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt || true
         pip install -r dev-requirements.txt || true
-        pip install pytest pytest-asyncio pytest-cov black isort flake8 safety bandit pyyaml rich
+        pip install pytest pytest-asyncio pytest-cov black isort flake8 safety bandit pyyaml rich openai
+
+    - name: Mask secrets in logs
+      run: |
+        echo "::add-mask::sk-"
+        echo "::add-mask::OPENAI_API_KEY"
 
     - name: Code Formatting Check (Black)
       run: black --check --diff .

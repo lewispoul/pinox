@@ -7,8 +7,8 @@ __pycache__/
 env/
 venv/
 
-# Nox build/runtime
-nox/
+# Nox build/runtime (temporarily commented out for agent testing)
+# nox/
 sandbox/
 *.log
 

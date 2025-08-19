@@ -79,47 +79,30 @@ def preflight_checks() -> None:
         sys.exit(1)
 
 def call_llm(prompt: str) -> str:
-    """Call OpenAI LLM with the prompt and return response."""
-    try:
-        import openai
-        import os
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY environment variable not set")
-        
-        client = openai.OpenAI(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are the Nox Planner. Output only JSON per planner.py spec. Keep all patch lines under 120 characters. No line wrapping."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.2,
-            max_tokens=2000
-        )
-        
-        raw_response = response.choices[0].message.content
-        
-        # More aggressive patch cleaning for line wrapping issues
-        # Fix common LLM line wrapping patterns
-        import re
-        
-        # Fix broken lines that end with "no" and continue with "t in data:"
-        raw_response = re.sub(r'(\+ *.*?)no\n(\s*)t in data:', r'\1not in data:', raw_response, flags=re.MULTILINE)
-        
-        # Fix broken lines that end with string quotes and continue on next line
-        raw_response = re.sub(r'(\+ *.*?JSON data)\'\n\)\s*(\+ *.*)', r"\1')\n\2", raw_response, flags=re.MULTILINE)
-        
-        # Fix other common wrapping patterns
-        raw_response = re.sub(r'(\+.*?)(\n\s*)([\w\s]*?\+.*)', r'\1\3', raw_response, flags=re.MULTILINE)
-        
-        return raw_response
-        
-    except ImportError:
-        raise RuntimeError("openai package not installed. Run: pip install openai")
-    except Exception as e:
-        raise RuntimeError(f"OpenAI API call failed: {e}")
+    """
+    If NOX_PLAN_FILE is set, return its contents (offline plan injection).
+    Otherwise call OpenAI as usual.
+    """
+    plan_file = os.getenv("NOX_PLAN_FILE")
+    if plan_file:
+        return Path(plan_file).read_text(encoding="utf-8")
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not set")
+    
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+    resp = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role":"system","content":"You are the Nox Planner. Output only compact JSON as per planner.py spec."},
+            {"role":"user","content": prompt},
+        ],
+        temperature=0.2,
+        max_tokens=2000,
+    )
+    return resp.choices[0].message.content
 
 def apply_patch(patch: str, allowlist, cfg) -> bool:
     """Apply patch with size and scope validation."""

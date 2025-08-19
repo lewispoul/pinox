@@ -109,7 +109,7 @@ kubectl wait --for=condition=ready pod -l app=nox-api -n nox-staging-green --tim
 export BASE_URL="https://staging-api.yourdomain.com"
 export NAMESPACE="nox-staging-green"
 
-./scripts/validate_staging.sh
+docs/deployment-guides/PRODUCTION_CREDENTIALS_GUIDE.md
 
 
 # MUST SEE: "VALIDATION PASSED - Ready for production deployment!"

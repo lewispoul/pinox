@@ -36,7 +36,7 @@ curl https://api.yourdomain.com/version
 ```bash
 
 # Full staging validation (15 min)
-./scripts/validate_staging.sh
+docs/deployment-guides/PRODUCTION_CREDENTIALS_GUIDE.md
 
 
 # Quick performance test (5 min)

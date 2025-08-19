@@ -1,12 +1,23 @@
 import json
 
-def parse_xtbout(json_string):
-    # Robust parsing implementation
+REQUIRED = ("energy", "homo_lumo_gap_ev", "dipole_debye")
+
+class XTBParseError(ValueError):
+    pass
+
+def parse_xtbout_text(text: str) -> dict:
+    """Parse xtbout.json text and normalize schema to {energy, gap, dipole}."""
     try:
-        data = json.loads(json_string)
-        # Validate required fields
-        if 'energy' not in data or 'gap' not in data or 'dipole' not in data:
-            raise ValueError('Missing required fields in JSON data')
-        return data
-    except json.JSONDecodeError:
-        raise ValueError('Invalid JSON data')
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        raise XTBParseError(f"invalid JSON: {e}") from e
+
+    missing = [k for k in REQUIRED if k not in data]
+    if missing:
+        raise XTBParseError(f"missing field(s): {', '.join(missing)}")
+
+    return {
+        "energy": float(data["energy"]),                  # Hartree (Eh)
+        "gap": float(data["homo_lumo_gap_ev"]),           # eV
+        "dipole": float(data["dipole_debye"])             # Debye
+    }

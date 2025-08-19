@@ -1,4 +1,5 @@
 # 🔐 NOX API v8.0.0 - Production Credentials Setup Guide
+# ⚠️ DO NOT COMMIT SECRETS OR CREDENTIALS TO VERSION CONTROL. Always use environment variables and secure secret storage.
 
 **Date:** August 15, 2025  
 **Version:** v8.0.0  
@@ -15,6 +16,7 @@ This document lists all production credentials and external resources required f
 
 
 ## 📋 **REQUIRED CREDENTIALS CHECKLIST**
+> **Tip:** After each credential is obtained, immediately update your `.env.production` file and verify with the health check script.
 
 
 ### ✅ **OAuth2 Provider Credentials**
@@ -262,6 +264,7 @@ CNAME api        your-domain.com
 
 
 ## 📝 **ENVIRONMENT VARIABLES REFERENCE**
+> **Important:** After updating environment variables, run the health check and backup validation scripts to confirm all credentials and secrets are working.
 
 After obtaining all credentials, update `.env.production`:
 
@@ -298,6 +301,14 @@ SMTP_PASS=[YOUR-SMTP-PASSWORD]
 
 
 ## 🔧 **SETUP PRIORITY ORDER**
+## 🛡️ **Audit Logging & Rate Limiting Validation**
+
+After deployment, ensure these features are enabled and functioning:
+
+- [ ] Audit logging is enabled (`ENABLE_AUDIT_LOGGING=true` in `.env.production`)
+- [ ] Rate limiting is enabled (`ENABLE_RATE_LIMITING=true` in `.env.production`)
+- [ ] Logs are being generated and rotated (`/var/log/nox/`)
+- [ ] Run `health-check-production.sh` and review logs for audit/rate limit events
 
 
 ### **Phase 1: Critical Infrastructure**
@@ -342,6 +353,16 @@ SMTP_PASS=[YOUR-SMTP-PASSWORD]
 
 
 ## ✅ **VALIDATION CHECKLIST**
+## 🔄 **Backup & Restore Validation**
+
+1. **Test backup creation:**
+   - Run the backup script or command (see `deploy-production.sh` and `OPS_RELEASE_DAY_RUNBOOK.md`).
+   - Confirm backup files are created in `/opt/nox/backups` or configured location.
+2. **Test restore procedure:**
+   - Follow restore instructions in `OPS_RELEASE_DAY_RUNBOOK.md`.
+   - Validate application and database integrity after restore.
+3. **Backup retention:**
+   - Confirm old backups are pruned according to retention policy.
 
 Before considering production deployment complete:
 
@@ -420,15 +441,23 @@ If you encounter issues during credential setup:
 - Rotate credentials regularly
 - Monitor for unauthorized access
 
-
 ### **Getting Help**
-- Check the Production Deployment Guide for detailed instructions
-- Run health check script to diagnose issues
-- Review application logs for specific errors
 
----
 
 **Status:** ⏳ **WAITING FOR CREDENTIALS**  
 **Next Step:** Obtain required credentials and update `.env.production`  
 **Estimated Setup Time:** 2-4 hours  
 **Priority:** HIGH - Required for production deployment
+## ✅ **FINAL PRODUCTION CHECKLIST**
+
+Before going live, confirm ALL items below:
+
+- [ ] All secrets generated, stored securely, and referenced via environment variables
+- [ ] Backup and restore procedures tested
+- [ ] Audit logging and rate limiting enabled and verified
+- [ ] Health check script passes with no errors
+- [ ] Monitoring and alerting configured
+- [ ] No credentials or secrets in version control
+- [ ] All onboarding and documentation links validated
+
+**If any item is incomplete, STOP and resolve before proceeding to production.**

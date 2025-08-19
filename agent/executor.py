@@ -11,6 +11,9 @@ def apply_changes_via_files(changes, allowlist) -> str:
     Write files per 'changes' and return a valid unified diff string produced by git.
     Does not commit. Leaves changes staged.
     """
+    print(f"DEBUG: Received {len(changes)} changes")
+    print(f"DEBUG: Changes: {changes}")
+    
     # allowlist check
     for ch in changes:
         p = ch.get("path", "")
@@ -21,6 +24,7 @@ def apply_changes_via_files(changes, allowlist) -> str:
     for ch in changes:
         action = ch.get("action", "create_or_update")
         path = Path(ch["path"])
+        print(f"DEBUG: Processing {action} for {path}")
         if action in ("create_or_update", "create", "update"):
             path.parent.mkdir(parents=True, exist_ok=True)
             content = ch.get("content", "")
@@ -162,12 +166,15 @@ def run_once(dry_run: bool = False, no_pr: bool = False) -> bool:
     prompt = build_planner_prompt(ctx["task_yaml"], ctx["repo_tree"], ctx["file_snippets"])
 
     plan_text = call_llm(prompt)
+    print(f"DEBUG: Raw LLM response: {plan_text[:500]}...")
     plan = plan_text
     try:
         plan_json = parse_planner_json(plan_text)
+        print(f"DEBUG: Parsed plan_json keys: {list(plan_json.keys())}")
         plan = json.dumps(plan_json, indent=2)
     except Exception as e:
         print(f"ERROR: Failed to parse planner JSON: {e}")
+        print(f"DEBUG: Raw response causing error: {plan_text}")
         if dry_run:
             sys.exit(1)
         plan_json = {"changes": []}

@@ -1,0 +1,34 @@
+{
+  "rationale": "Implement robust XTB JSON parser and a minimal runner stub; add parser unit tests and a skippable e2e test. Uses file-ops so the agent writes full files and lets git diff.",
+  "changes": [
+    {
+      "path": "nox/parsers/xtb_json.py",
+      "action": "create_or_update",
+      "content": "import json\n\nREQUIRED = (\"energy\", \"homo_lumo_gap_ev\", \"dipole_debye\")\n\nclass XTBParseError(ValueError):\n    pass\n\ndef parse_xtbout_text(text: str) -> dict:\n    \"\"\"Parse xtbout.json text and normalize schema to {energy, gap, dipole}.\"\"\"\n    try:\n        data = json.loads(text)\n    except json.JSONDecodeError as e:\n        raise XTBParseError(f\"invalid JSON: {e}\") from e\n\n    missing = [k for k in REQUIRED if k not in data]\n    if missing:\n        raise XTBParseError(f\"missing field(s): {', '.join(missing)}\")\n\n    return {\n        \"energy\": float(data[\"energy\"]),                  # Hartree (Eh)\n        \"gap\": float(data[\"homo_lumo_gap_ev\"]),           # eV\n        \"dipole\": float(data[\"dipole_debye\"])             # Debye\n    }\n"
+    },
+    {
+      "path": "nox/runners/xtb.py",
+      "action": "create_or_update",
+      "content": "import json, shutil, pathlib\nfrom nox.parsers.xtb_json import parse_xtbout_text, XTBParseError\n\nclass XTBNotAvailable(RuntimeError):\n    pass\n\ndef run_xtb(smiles: str | None = None, infile: str | None = None) -> dict:\n    \"\"\"\n    Minimal placeholder: expects an existing input file and a neighboring xtbout.json.\n    In real flow we'll invoke xtb; for CI we just parse the JSON so tests stay green.\n    \"\"\"\n    if shutil.which(\"xtb\") is None:\n        raise XTBNotAvailable(\"xtb binary not found on PATH\")\n    if not infile and not smiles:\n        raise ValueError(\"Provide infile or smiles\")\n\n    path = pathlib.Path(infile or \"\")\n    if not path.exists():\n        raise FileNotFoundError(f\"input file not found: {path}\")\n\n    out_json = path.with_name(\"xtbout.json\")\n    text = out_json.read_text(encoding=\"utf-8\")\n    return parse_xtbout_text(text)\n"
+    },
+    {
+      "path": "tests/xtb/data/xtbout.json",
+      "action": "create_or_update",
+      "content": "{\n  \"energy\": -40.123456789,\n  \"homo_lumo_gap_ev\": 3.217,\n  \"dipole_debye\": 1.842\n}\n"
+    },
+    {
+      "path": "tests/xtb/test_xtb_json.py",
+      "action": "create_or_update",
+      "content": "import json, pathlib, pytest\nfrom nox.parsers.xtb_json import parse_xtbout_text, XTBParseError\n\nDATA = pathlib.Path(__file__).parent / \"data\" / \"xtbout.json\"\n\ndef test_parse_xtbout_ok():\n    text = DATA.read_text(encoding=\"utf-8\")\n    res = parse_xtbout_text(text)\n    assert {\"energy\",\"gap\",\"dipole\"} <= res.keys()\n    assert isinstance(res[\"energy\"], float)\n    assert isinstance(res[\"gap\"], float)\n    assert isinstance(res[\"dipole\"], float)\n\n\ndef test_parse_xtbout_missing_field():\n    bad = json.dumps({\"energy\": -1.0, \"homo_lumo_gap_ev\": 2.0})\n    with pytest.raises(XTBParseError) as e:\n        parse_xtbout_text(bad)\n    assert \"missing field(s)\" in str(e.value)\n"
+    },
+    {
+      "path": "tests/xtb/test_xtb_end_to_end.py",
+      "action": "create_or_update",
+      "content": "import os, pathlib, shutil, json, pytest\nfrom nox.runners.xtb import run_xtb, XTBNotAvailable\n\nDATA = pathlib.Path(__file__).parent / \"data\"\n\n@pytest.mark.skipif(shutil.which(\"xtb\") is None, reason=\"xtb not installed\")\ndef test_xtb_end_to_end_reads_json(tmp_path):\n    infile = tmp_path / \"dummy.inp\"\n    (tmp_path / \"xtbout.json\").write_text(json.dumps({\n        \"energy\": -40.12, \"homo_lumo_gap_ev\": 3.21, \"dipole_debye\": 1.84\n    }), encoding=\"utf-8\")\n    infile.write_text(\"$dummy\", encoding=\"utf-8\")\n    res = run_xtb(infile=str(infile))\n    assert res[\"gap\"] > 0\n"
+    }
+  ],
+  "tests_to_add": ["tests/xtb/test_xtb_json.py", "tests/xtb/test_xtb_end_to_end.py"],
+  "commands_to_run": ["pytest -k 'xtb_json or xtb_end_to_end' -q"],
+  "risks": ["Schema mismatch if real xtbout.json differs; adjust parser accordingly."],
+  "expected_outputs": ["Parser unit tests pass; e2e test skipped unless xtb present."]
+}

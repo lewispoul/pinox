@@ -1,6 +1,6 @@
 # file: agent/executor.py
 from __future__ import annotations
-import argparse, json, yaml
+import argparse, json, yaml, os, re, subprocess, sys
 from pathlib import Path
 from agent.tools import fs, git, shell, tests, codeedit
 from agent.planner import build_planner_prompt, parse_planner_json
@@ -13,26 +13,85 @@ def load_config():
     except Exception:
         return {}
 
-def call_llm(prompt: str) -> str:
-    # Placeholder: Copilot will wire actual LLM call if desired.
-    # For bootstrap, just return a minimal plan with no patch.
-    dummy = {
-        "rationale": "Bootstrap run — no-op patch.",
-        "files_to_edit": [],
-        "tests_to_add": [],
-        "commands_to_run": ["pytest -q"],
-        "risks": ["No-op bootstrap"],
-        "expected_outputs": ["CI sanity passes"],
-        "patch": ""
-    }
-    return json.dumps(dummy, indent=2)
+def redact(text: str) -> str:
+    """Redact secrets and keys from text to prevent leakage."""
+    # Redact OpenAI API keys
+    text = re.sub(r"sk-[A-Za-z0-9]{10,}", "sk-***REDACTED***", text)
+    # Redact environment variable assignments
+    text = re.sub(r"(OPENAI_API_KEY\s*=\s*)(.+)", r"\1***REDACTED***", text)
+    text = re.sub(r"(GITHUB_TOKEN\s*=\s*)(.+)", r"\1***REDACTED***", text)
+    # Redact any other common secret patterns
+    text = re.sub(r"(Bearer\s+)[A-Za-z0-9_-]{20,}", r"\1***REDACTED***", text)
+    return text
 
-def apply_patch(patch: str, allowlist):
+def preflight_checks() -> None:
+    """Run preflight checks to ensure safe operation."""
+    # Check if on main branch
+    try:
+        current_branch = subprocess.check_output(
+            "git rev-parse --abbrev-ref HEAD", shell=True, text=True
+        ).strip()
+        if current_branch == "main":
+            print("ERROR: Agent cannot run on main branch. Switch to a feature branch.")
+            sys.exit(1)
+    except subprocess.CalledProcessError:
+        print("ERROR: Failed to check current branch")
+        sys.exit(1)
+    
+    # Check if working tree is dirty
+    try:
+        status = subprocess.check_output(
+            "git status --porcelain", shell=True, text=True
+        ).strip()
+        if status:
+            print("ERROR: Working tree is dirty. Commit or stash changes before running agent.")
+            sys.exit(1)
+    except subprocess.CalledProcessError:
+        print("ERROR: Failed to check git status")
+        sys.exit(1)
+
+def call_llm(prompt: str) -> str:
+    """Call OpenAI API with the planner prompt."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable not set")
+    
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are the Nox Planner. Output only JSON per planner.py spec."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.2,
+            max_tokens=2000
+        )
+        
+        return response.choices[0].message.content
+    except ImportError:
+        raise RuntimeError("openai package not installed. Run: pip install openai")
+    except Exception as e:
+        raise RuntimeError(f"OpenAI API call failed: {e}")
+
+def apply_patch(patch: str, allowlist, cfg) -> bool:
+    """Apply patch with size and scope validation."""
     if not patch.strip():
         return False
+    
+    # Check patch size
+    max_lines = cfg.get("policies", {}).get("max_patch_size_lines", 1200)
+    added_lines = codeedit.count_added_lines(patch)
+    if added_lines > max_lines:
+        print(f"ERROR: Patch too large ({added_lines} lines > {max_lines} limit)")
+        sys.exit(1)
+    
     codeedit.check_unified_diff(patch)
     if not codeedit.only_in_allowed_paths(patch, allowlist):
         raise RuntimeError("Patch touches files outside allowlist.")
+    
     # Simple application via 'git apply' to keep it robust
     from subprocess import check_call, CalledProcessError
     try:

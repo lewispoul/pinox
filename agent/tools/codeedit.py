@@ -11,18 +11,22 @@ def check_unified_diff(patch_text: str) -> None:
         raise ValueError("Patch does not look like a unified diff.")
 
 def only_in_allowed_paths(patch_text: str, allowlist: Iterable[str]=()) -> bool:
-    # naive path filter: forbid edits outside listed prefixes
+    if not allowlist:
+        return True
     touched = set()
     for line in patch_text.splitlines():
         if line.startswith(("+++ ", "--- ")):
-            path = line.split("\t")[0].split(" ", 1)[1].strip()
-            if path.startswith(("a/", "b/")): path = path[2:]
-            # Skip /dev/null which appears for new files
-            if path != "/dev/null":
-                touched.add(path)
-    if not allowlist:
-        return True
-    return all(any(p.startswith(prefix.rstrip("*").rstrip("/")) for prefix in allowlist) for p in touched)
+            parts = line.split("\t")[0].split(" ", 1)
+            if len(parts) < 2:
+                continue
+            path = parts[1].strip()
+            if path in ("/dev/null", "null", "NULL"):
+                continue
+            if path.startswith(("a/", "b/")):
+                path = path[2:]
+            touched.add(path)
+    return all(any(p.startswith(prefix.rstrip("*").rstrip("/")) for prefix in allowlist)
+               for p in touched)
 
 def count_added_lines(patch_text: str) -> int:
     """Count the number of lines added in a unified diff (excluding +++ headers)."""

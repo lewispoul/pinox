@@ -6,6 +6,34 @@ from agent.tools import fs, git, shell, tests, codeedit
 from agent.planner import build_planner_prompt, parse_planner_json
 from agent.reporter import summarize_run
 
+def apply_changes_via_files(changes, allowlist) -> str:
+    """
+    Write files per 'changes' and return a valid unified diff string produced by git.
+    Does not commit. Leaves changes staged.
+    """
+    # allowlist check
+    for ch in changes:
+        p = ch.get("path", "")
+        if not any(p.startswith(prefix.rstrip("*").rstrip("/")) for prefix in allowlist):
+            raise RuntimeError(f"Change touches disallowed path: {p}")
+
+    # write/delete files
+    for ch in changes:
+        action = ch.get("action", "create_or_update")
+        path = Path(ch["path"])
+        if action in ("create_or_update", "create", "update"):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            content = ch.get("content", "")
+            path.write_text(content, encoding="utf-8", newline="\n")
+        elif action == "delete":
+            if path.exists():
+                path.unlink()
+
+    # stage and generate diff from index
+    subprocess.check_call("git add -A", shell=True)
+    diff = subprocess.check_output("git diff --cached --unified=3", shell=True, text=True)
+    return diff
+
 def load_config():
     try:
         import yaml as _yaml
@@ -142,28 +170,49 @@ def run_once(dry_run: bool = False, no_pr: bool = False) -> bool:
         print(f"ERROR: Failed to parse planner JSON: {e}")
         if dry_run:
             sys.exit(1)
-        plan_json = {"patch": ""}
+        plan_json = {"changes": []}
+
+    # New file-ops approach with backward compatibility
+    allowlist = cfg.get("files_allowlist", [])
+    patch_text = ""
+    
+    if "changes" in plan_json and plan_json["changes"]:
+        # Preferred new path: write files, stage, generate diff
+        patch_text = apply_changes_via_files(plan_json["changes"], allowlist)
+    elif plan_json.get("patch"):
+        # Backward compatibility: show patch for visibility,
+        # but DO NOT git-apply (it's brittle). Leave 'patch_text' as-is for display only.
+        patch_text = str(plan_json["patch"])
+
+    # size guard
+    max_added = int(cfg.get("policies", {}).get("max_patch_size_lines", 1200))
+    if isinstance(patch_text, str):
+        added_lines = sum(1 for ln in patch_text.splitlines()
+                          if ln.startswith("+") and not ln.startswith("+++"))
+        if added_lines > max_added:
+            raise RuntimeError(f"Patch exceeds size cap ({added_lines} > {max_added}).")
 
     if dry_run:
-        # Dry-run: print redacted plan and diff, then exit
         print("=== DRY RUN MODE ===")
         print("Plan:")
-        print(redact(plan))
+        print(redact(json.dumps(plan_json, indent=2)))
         print("\nProposed diff:")
-        print(redact(plan_json.get("patch", "")))
+        print(patch_text)
         return True
 
+    # Real run:
     branch = f"{cfg.get('branch_prefix','agent/')}{task.get('id','task')}"
     git.create_branch(branch)
-
-    patch_ok = apply_patch(plan_json.get("patch",""), cfg.get("files_allowlist", []), cfg)
-    if patch_ok:
-        git.commit_all(f"agent: apply patch for {task.get('id')}")
+    
+    # If we used 'changes', the index is already staged. If we only had 'patch' and no 'changes',
+    # there's nothing staged; in that case we simply won't commit.
+    if isinstance(patch_text, str) and patch_text.strip() and "changes" in plan_json:
+        git.commit_all(f"agent: apply changes for {task.get('id')}")
 
     tests_ok = tests.run_all()
     
     if not no_pr:
-        report = redact(summarize_run(task, plan, patch_ok, tests_ok, tests.last_output()))
+        report = redact(summarize_run(task, plan, True, tests_ok, tests.last_output()))
         git.open_pr(title=f"agent: {task.get('id')} {task.get('title')}", body=report)
     
     return tests_ok

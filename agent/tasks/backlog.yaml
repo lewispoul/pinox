@@ -1,6 +1,17 @@
+- id: FILE-OPS-TEST
+  title: Test file-ops system with simple enhancement
+  priority: high
+  scope:
+    paths:
+      - "nox/runners/xtb.py"
+      - "nox/parsers/xtb_json.py"  
+      - "tests/xtb/"
+  done_when:
+    - "files have proper TODO comments and test coverage"
+
 - id: XTBA-001
   title: Wire real XTB runner and robust xtbout.json parser
-  priority: high
+  priority: medium
   scope:
     paths:
       - "nox/runners/xtb.py"

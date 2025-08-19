@@ -4,20 +4,19 @@ import os, json, textwrap
 from typing import Dict, Any, List, Tuple
 
 PROMPT_TEMPLATE = textwrap.dedent("""\
-System: You are the Nox Planner. Output only a compact JSON object with keys:
+System: You are the Nox Planner. Output ONLY compact JSON with keys:
 - rationale: short reasoning
-- files_to_edit: list of paths (must be inside allowed scope)
+- changes: list of objects {{path, action, content}}. action ∈ {{"create_or_update","delete"}}.
 - tests_to_add: list of test file paths
 - commands_to_run: list of shell commands (pytest etc.)
 - risks: short bullet list
 - expected_outputs: short bullet list
-- patch: a single unified diff covering all edits (unix newlines)
 
-Constraints:
-- Edit only within scope paths.
-- Prefer test-first changes.
-- Keep patch small and idempotent.
-- No secrets, no external network calls.
+Rules:
+- Edit only within the task scope paths.
+- Provide FULL file contents in 'content' for any create_or_update action.
+- Do NOT output diffs. Do NOT wrap lines. Use Unix newlines.
+- Keep total output concise; omit unnecessary commentary.
 
 User:
 Task:

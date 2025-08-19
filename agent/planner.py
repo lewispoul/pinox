@@ -19,6 +19,33 @@ Constraints:
 - Keep patch small and idempotent.
 - No secrets, no external network calls.
 
+CRITICAL DIFF FORMAT:
+For NEW files that don't exist, use this exact header format:
+```
+diff --git a/path/to/newfile.py b/path/to/newfile.py
+new file mode 100644
+index 0000000..1234567
+--- /dev/null
++++ b/path/to/newfile.py
+@@ -0,0 +1,N @@
++line1
++line2
++...
+```
+
+For EXISTING files, use:
+```
+diff --git a/path/to/existing.py b/path/to/existing.py
+index 1234567..abcdefg 100644
+--- a/path/to/existing.py
++++ b/path/to/existing.py
+@@ -M,N +M,P @@
+ context
+-old line
++new line
+ context
+```
+
 User:
 Task:
 {task_yaml}

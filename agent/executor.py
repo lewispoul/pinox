@@ -92,6 +92,9 @@ def apply_patch(patch: str, allowlist, cfg) -> bool:
     if not codeedit.only_in_allowed_paths(patch, allowlist):
         raise RuntimeError("Patch touches files outside allowlist.")
     
+    # Ensure directories exist for new files
+    codeedit.ensure_directories_for_new_files(patch)
+    
     # Simple application via 'git apply' to keep it robust
     from subprocess import check_call, CalledProcessError
     try:

@@ -51,11 +51,7 @@ def preflight_checks() -> None:
         sys.exit(1)
 
 def call_llm(prompt: str) -> str:
-    """Call OpenAI API with the planner prompt."""
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable not set")
-    
+    """Call OpenAI LLM with the prompt and return response."""
     try:
         import openai
         client = openai.OpenAI(api_key=api_key)
@@ -63,14 +59,37 @@ def call_llm(prompt: str) -> str:
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are the Nox Planner. Output only JSON per planner.py spec."},
+                {"role": "system", "content": "You are the Nox Planner. Output only JSON per planner.py spec. Keep all patch lines under 120 characters. No line wrapping."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.2,
             max_tokens=2000
         )
         
-        return response.choices[0].message.content
+        raw_response = response.choices[0].message.content
+        
+        # Clean up any line wrapping issues in the patch section
+        # This is a workaround for LLM generating broken diff lines
+        lines = raw_response.split('
+')
+        cleaned_lines = []
+        for i, line in enumerate(lines):
+            # If this looks like a broken diff line, try to fix it
+            if (line.startswith('+') or line.startswith('-')) and not line.startswith(('+++ ', '--- ')):
+                # Check if the line is broken mid-way through a string or condition
+                if line.endswith(('no', 't in data:', 'JSON data')')) or line.count('"') % 2 == 1:
+                    # Try to merge with the next line
+                    if i + 1 < len(lines) and not lines[i + 1].startswith(('+', '-', '@', 'diff')):
+                        merged_line = line + lines[i + 1]
+                        cleaned_lines.append(merged_line)
+                        lines[i + 1] = ""  # Skip the next line
+                        continue
+            if line:  # Only add non-empty lines
+                cleaned_lines.append(line)
+        
+        return '
+'.join(cleaned_lines)
+        
     except ImportError:
         raise RuntimeError("openai package not installed. Run: pip install openai")
     except Exception as e:

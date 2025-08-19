@@ -70,14 +70,13 @@ def call_llm(prompt: str) -> str:
         
         # Clean up any line wrapping issues in the patch section
         # This is a workaround for LLM generating broken diff lines
-        lines = raw_response.split('
-')
+        lines = raw_response.split('\n')
         cleaned_lines = []
         for i, line in enumerate(lines):
             # If this looks like a broken diff line, try to fix it
             if (line.startswith('+') or line.startswith('-')) and not line.startswith(('+++ ', '--- ')):
                 # Check if the line is broken mid-way through a string or condition
-                if line.endswith(('no', 't in data:', 'JSON data')')) or line.count('"') % 2 == 1:
+                if line.endswith(('no', 't in data:', 'JSON data')) or line.count('"') % 2 == 1:
                     # Try to merge with the next line
                     if i + 1 < len(lines) and not lines[i + 1].startswith(('+', '-', '@', 'diff')):
                         merged_line = line + lines[i + 1]
@@ -87,8 +86,7 @@ def call_llm(prompt: str) -> str:
             if line:  # Only add non-empty lines
                 cleaned_lines.append(line)
         
-        return '
-'.join(cleaned_lines)
+        return '\n'.join(cleaned_lines)
         
     except ImportError:
         raise RuntimeError("openai package not installed. Run: pip install openai")

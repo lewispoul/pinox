@@ -17,7 +17,9 @@ def only_in_allowed_paths(patch_text: str, allowlist: Iterable[str]=()) -> bool:
         if line.startswith(("+++ ", "--- ")):
             path = line.split("\t")[0].split(" ", 1)[1].strip()
             if path.startswith(("a/", "b/")): path = path[2:]
-            touched.add(path)
+            # Skip /dev/null which appears for new files
+            if path != "/dev/null":
+                touched.add(path)
     if not allowlist:
         return True
     return all(any(p.startswith(prefix.rstrip("*").rstrip("/")) for prefix in allowlist) for p in touched)

@@ -54,6 +54,11 @@ def call_llm(prompt: str) -> str:
     """Call OpenAI LLM with the prompt and return response."""
     try:
         import openai
+        import os
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY environment variable not set")
+        
         client = openai.OpenAI(api_key=api_key)
         
         response = client.chat.completions.create(

@@ -1,0 +1,17 @@
+# Nox Agent configuration
+branch_prefix: "agent/"
+planner:
+  model: "gpt-4o-mini"
+  max_tokens: 5000
+  temperature: 0.2
+files_allowlist:
+  - "agent/**"
+  - "api/**"
+  - "nox/**"
+  - "tests/**"
+  - ".github/**"
+  - "dev-requirements.txt"
+policies:
+  require_tests: true
+  forbid_main_push: true
+  max_patch_size_lines: 1200

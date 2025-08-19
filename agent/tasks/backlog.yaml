@@ -1,0 +1,53 @@
+- id: XTBA-001
+  title: Wire real XTB runner and robust xtbout.json parser
+  priority: high
+  scope:
+    paths:
+      - "nox/runners/xtb.py"
+      - "nox/parsers/xtb_json.py"
+      - "tests/xtb/"
+  done_when:
+    - "pytest -k xtb_end_to_end passes"
+    - "endpoint /run_xtb returns energy, gap, dipole"
+
+- id: JOBS-002
+  title: Activate Dramatiq jobs from API with state polling
+  priority: high
+  scope:
+    paths:
+      - "api/routes/jobs.py"
+      - "nox/jobs/"
+      - "tests/jobs/"
+  done_when:
+    - "POST /jobs enqueues and /jobs/<id> shows states"
+
+- id: CUBE-003
+  title: Generate HOMO and LUMO .cube artifacts from XTB
+  priority: medium
+  scope:
+    paths:
+      - "nox/runners/xtb.py"
+      - "nox/artifacts/"
+      - "tests/cube/"
+  done_when:
+    - "endpoint returns cube artifacts; viewer test asserts presence"
+
+- id: CJ-004
+  title: "Cantera CJ wrapper: Pcj, Tcj, CSV artifact"
+  priority: medium
+  scope:
+    paths:
+      - "nox/runners/cantera_cj.py"
+      - "api/routes/predict_cj.py"
+      - "tests/cj/"
+  done_when:
+    - "simple CHNO case returns Pcj and Tcj with CSV"
+
+- id: E2E-005
+  title: "End-to-end pytest: submit job, poll, collect results"
+  priority: medium
+  scope:
+    paths:
+      - "tests/e2e/"
+  done_when:
+    - "submit -> poll -> results with scalars and artifacts"

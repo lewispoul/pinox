@@ -18,6 +18,10 @@ passlib[bcrypt]==1.7.4
 # HTTP client for OAuth2 providers
 httpx==0.28.1
 
+# Task queue and background jobs
+dramatiq>=1.13.0
+redis>=4.5.0
+
 # Security and cryptography
 cryptography>=41.0.0
 

@@ -73,10 +73,7 @@ def submit_job(kind: str, payload: Dict[str, Any]) -> str:
             if isinstance(result, dict) and "returncode" in result:
                 rc = result.get("returncode")
                 has_energy = (
-                    result.get("scalars", {}).get(
-                        "E_total_hartree"
-                    )
-                    is not None
+                    result.get("scalars", {}).get("E_total_hartree") is not None
                 )
                 success = (rc == 0) or (rc == 2 and has_energy)
                 if not success:
@@ -129,13 +126,13 @@ def _default_xtb_runner(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     # XTB success: return code 0 OR (return code 2 with valid energy results)
     has_energy = result.get("scalars", {}).get("E_total_hartree") is not None
-    success = ((result.get("returncode") == 0) or
-               (result.get("returncode") == 2 and has_energy))
+    success = (result.get("returncode") == 0) or (
+        result.get("returncode") == 2 and has_energy
+    )
 
     if not success:
         error_msg = (
-            "XTB calculation failed with return code "
-            f"{result.get('returncode')}"
+            "XTB calculation failed with return code " f"{result.get('returncode')}"
         )
         raise RuntimeError(error_msg)
 
@@ -153,4 +150,3 @@ def set_xtb_runner(runner_callable):
     """
     global _xtb_runner
     _xtb_runner = runner_callable
-

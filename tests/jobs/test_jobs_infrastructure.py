@@ -61,11 +61,7 @@ class TestJobStorage:
     def test_save_and_load_job(self, temp_storage):
         """Test saving and loading job data"""
         job_id = "test_job_123"
-        job_data = {
-            "state": "pending",
-            "message": "Test job",
-            "progress": 0.0
-        }
+        job_data = {"state": "pending", "message": "Test job", "progress": 0.0}
 
         # Save job
         temp_storage.save_job(job_id, job_data)
@@ -161,10 +157,7 @@ class TestJobManager:
 
     def test_create_job(self, temp_manager):
         """Test job creation"""
-        job_request = {
-            "engine": "xtb",
-            "inputs": {"xyz": "H 0 0 0"}
-        }
+        job_request = {"engine": "xtb", "inputs": {"xyz": "H 0 0 0"}}
 
         job_id = temp_manager.create_job(job_request)
         assert len(job_id) == 32  # UUID hex format
@@ -186,9 +179,7 @@ class TestJobManager:
         job_id = temp_manager.create_job({"test": "data"})
 
         # Valid transition: pending -> running
-        success = temp_manager.update_job_state(
-            job_id, JobState.RUNNING, "Processing"
-        )
+        success = temp_manager.update_job_state(job_id, JobState.RUNNING, "Processing")
         assert success
 
         job_data = temp_manager.get_job(job_id)
@@ -208,10 +199,7 @@ class TestJobManager:
         """Test setting job result"""
         job_id = temp_manager.create_job({"test": "data"})
 
-        result_data = {
-            "scalars": {"energy": -1.0},
-            "artifacts": []
-        }
+        result_data = {"scalars": {"energy": -1.0}, "artifacts": []}
 
         success = temp_manager.set_job_result(job_id, result_data)
         assert success

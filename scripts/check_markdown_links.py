@@ -8,16 +8,19 @@ import re
 import requests
 from pathlib import Path
 
+
 def find_markdown_files(root):
-    return list(Path(root).rglob('*.md'))
+    return list(Path(root).rglob("*.md"))
+
 
 def extract_links(md_text):
     # Matches [text](url) and <url>
-    pattern = re.compile(r'\[.*?\]\((.*?)\)|<(http[^>]+)>')
+    pattern = re.compile(r"\[.*?\]\((.*?)\)|<(http[^>]+)>")
     return [m.group(1) or m.group(2) for m in pattern.finditer(md_text)]
 
+
 def check_link(url):
-    if url.startswith('http'):  # External link
+    if url.startswith("http"):  # External link
         try:
             resp = requests.head(url, allow_redirects=True, timeout=5)
             return resp.status_code < 400
@@ -25,15 +28,16 @@ def check_link(url):
             return False
     else:  # Internal link
         # Remove anchors/fragments
-        file_path = url.split('#')[0]
+        file_path = url.split("#")[0]
         return os.path.exists(file_path)
 
+
 def main():
-    docs_root = os.path.join(os.path.dirname(__file__), 'docs')
+    docs_root = os.path.join(os.path.dirname(__file__), "docs")
     md_files = find_markdown_files(docs_root)
     broken = []
     for md_file in md_files:
-        with open(md_file, 'r', encoding='utf-8') as f:
+        with open(md_file, "r", encoding="utf-8") as f:
             text = f.read()
         links = extract_links(text)
         for link in links:
@@ -42,11 +46,12 @@ def main():
             if not check_link(link):
                 broken.append((md_file, link))
     if broken:
-        print('Broken links found:')
+        print("Broken links found:")
         for f, l in broken:
-            print(f'- {f}: {l}')
+            print(f"- {f}: {l}")
     else:
-        print('No broken links found.')
+        print("No broken links found.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

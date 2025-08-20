@@ -1,6 +1,5 @@
 import asyncio
 import time
-import os
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient
@@ -17,13 +16,14 @@ async def test_jobs_echo_flow_local_mode(monkeypatch):
     app.include_router(jobs_router)
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        r = await client.post("/jobs", json={"kind":"echo","payload":{"x":1}})
+        r = await client.post("/jobs", json={"kind": "echo", "payload": {"x": 1}})
         assert r.status_code == 200
-        job = r.json(); job_id = job["job_id"]
-        assert job["state"] in {"queued","running","done"}
+        job = r.json()
+        job_id = job["job_id"]
+        assert job["state"] in {"queued", "running", "done"}
         deadline = time.time() + 5
         state = job["state"]
-        while state not in {"done","failed"} and time.time() < deadline:
+        while state not in {"done", "failed"} and time.time() < deadline:
             await asyncio.sleep(0.05)
             r2 = await client.get(f"/jobs/{job_id}")
             state = r2.json()["state"]
@@ -34,7 +34,8 @@ async def test_jobs_echo_flow_local_mode(monkeypatch):
 async def test_jobs_store_redis_via_fakeredis(monkeypatch):
     # Validate Redis store behavior without real Redis
     from api.services import jobs_store as js
-    import fakeredis, json
+    import fakeredis
+
     fake = fakeredis.FakeRedis()
     store = js.RedisJobsStore(fake)
     j = store.create()

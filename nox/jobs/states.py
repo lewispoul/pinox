@@ -11,6 +11,7 @@ from typing import Set
 
 class JobState(str, Enum):
     """Enumeration of possible job states"""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -22,7 +23,7 @@ VALID_TRANSITIONS = {
     JobState.PENDING: {JobState.RUNNING, JobState.FAILED},
     JobState.RUNNING: {JobState.COMPLETED, JobState.FAILED},
     JobState.COMPLETED: set(),  # Terminal state
-    JobState.FAILED: set(),     # Terminal state
+    JobState.FAILED: set(),  # Terminal state
 }
 
 

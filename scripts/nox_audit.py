@@ -14,23 +14,74 @@ from typing import Dict, List, Optional, Tuple
 
 # ---------- Configurations ----------
 EXCLUDED_DIRS = {
-    "node_modules", ".venv", "venv", ".mypy_cache", ".pytest_cache",
-    "__pycache__", "dist", "build", ".next", ".turbo", ".parcel-cache",
-    ".cache", ".git", ".gitlab", ".idea", ".vscode", ".github"
+    "node_modules",
+    ".venv",
+    "venv",
+    ".mypy_cache",
+    ".pytest_cache",
+    "__pycache__",
+    "dist",
+    "build",
+    ".next",
+    ".turbo",
+    ".parcel-cache",
+    ".cache",
+    ".git",
+    ".gitlab",
+    ".idea",
+    ".vscode",
+    ".github",
 }
 
 EXCLUDED_EXTS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".zip", ".tar", ".gz",
-    ".bz2", ".7z", ".mp4", ".mov", ".avi", ".mkv", ".pdf", ".ico"
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".bz2",
+    ".7z",
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".mkv",
+    ".pdf",
+    ".ico",
 }
 
 HASHABLE_EXTS = {
-    ".py", ".ts", ".tsx", ".js", ".jsx", ".json", ".yml", ".yaml", ".toml",
-    ".ini", ".sh", ".bash", ".zsh", ".ps1", ".sql", ".md", ".rst", ".html",
-    ".css", ".scss", ".less", ".cfg", ".env", ".mjs", ".txt"
+    ".py",
+    ".ts",
+    ".tsx",
+    ".js",
+    ".jsx",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".ini",
+    ".sh",
+    ".bash",
+    ".zsh",
+    ".ps1",
+    ".sql",
+    ".md",
+    ".rst",
+    ".html",
+    ".css",
+    ".scss",
+    ".less",
+    ".cfg",
+    ".env",
+    ".mjs",
+    ".txt",
 }
 
 TARGET_DIRNAME = "nox-api-src"
+
 
 # ---------- Data structures ----------
 @dataclass
@@ -41,23 +92,28 @@ class FileMeta:
     mtime: str
     sha256: Optional[str] = None
 
+
 @dataclass
 class FolderStats:
     path: str
-    file_count: int = 0          # total in subtree
-    total_size: int = 0          # total in subtree
-    direct_files: int = 0        # immediate files only
+    file_count: int = 0  # total in subtree
+    total_size: int = 0  # total in subtree
+    direct_files: int = 0  # immediate files only
+
 
 # ---------- Utilities ----------
 def fail(msg: str, code: int = 1) -> None:
     print(f"[nox_audit] ERROR: {msg}", file=sys.stderr)
     sys.exit(code)
 
+
 def ok(msg: str) -> None:
     print(f"[nox_audit] {msg}")
 
+
 def local_iso(ts: float) -> str:
     return datetime.fromtimestamp(ts).isoformat(timespec="seconds")
+
 
 def sha256_file(path: Path, bufsize: int = 65536) -> str:
     h = hashlib.sha256()
@@ -69,6 +125,7 @@ def sha256_file(path: Path, bufsize: int = 65536) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+
 def is_hashable(path: Path) -> bool:
     ext = path.suffix.lower()
     if ext in HASHABLE_EXTS:
@@ -79,11 +136,14 @@ def is_hashable(path: Path) -> bool:
         return True
     return False
 
+
 def should_exclude_file(path: Path) -> bool:
     return path.suffix.lower() in EXCLUDED_EXTS
 
+
 def should_skip_dir(dirname: str) -> bool:
     return dirname in EXCLUDED_DIRS
+
 
 def find_nox_api_src(repo_root: Path) -> Path:
     # Prefer exactly repo_root / nox-api-src
@@ -96,6 +156,7 @@ def find_nox_api_src(repo_root: Path) -> Path:
         fail(f"Répertoire '{TARGET_DIRNAME}' introuvable sous {repo_root.resolve()}")
     matches.sort(key=lambda p: len(p.relative_to(repo_root).parts))
     return matches[0]
+
 
 # ---------- Scanning ----------
 def scan_directory(root: Path) -> Tuple[List[FileMeta], Dict[str, FolderStats], int]:
@@ -137,7 +198,7 @@ def scan_directory(root: Path) -> Tuple[List[FileMeta], Dict[str, FolderStats], 
                 size=size,
                 ext=ext if ext else "",
                 mtime=mtime,
-                sha256=None
+                sha256=None,
             )
             if is_hashable(abs_path):
                 try:
@@ -159,6 +220,7 @@ def scan_directory(root: Path) -> Tuple[List[FileMeta], Dict[str, FolderStats], 
 
     return files, folders, ignored_files_count
 
+
 # ---------- Tree rendering ----------
 def build_tree(files: List[FileMeta]) -> Dict:
     root = {"name": ".", "children": {}, "_files": []}
@@ -166,11 +228,20 @@ def build_tree(files: List[FileMeta]) -> Dict:
         parts = Path(fm.path).parts
         node = root
         for d in parts[:-1]:
-            node = node["children"].setdefault(d, {"name": d, "children": {}, "_files": []})
+            node = node["children"].setdefault(
+                d, {"name": d, "children": {}, "_files": []}
+            )
         node["_files"].append(fm)
     return root
 
-def render_tree(node: Dict, folders: Dict[str, FolderStats], depth: int, max_depth: int, prefix: str = "") -> List[str]:
+
+def render_tree(
+    node: Dict,
+    folders: Dict[str, FolderStats],
+    depth: int,
+    max_depth: int,
+    prefix: str = "",
+) -> List[str]:
     lines: List[str] = []
     items = sorted(node["children"].items(), key=lambda kv: kv[0].lower())
     last_idx = len(items) - 1
@@ -186,6 +257,7 @@ def render_tree(node: Dict, folders: Dict[str, FolderStats], depth: int, max_dep
             lines.extend(render_tree(child, folders, depth + 1, max_depth, new_prefix))
     return lines
 
+
 # ---------- Duplicates ----------
 def group_duplicates_by_name(files: List[FileMeta]) -> List[List[FileMeta]]:
     buckets: Dict[str, List[FileMeta]] = {}
@@ -194,12 +266,14 @@ def group_duplicates_by_name(files: List[FileMeta]) -> List[List[FileMeta]]:
         buckets.setdefault(key, []).append(f)
     return [v for v in buckets.values() if len(v) > 1]
 
+
 def group_duplicates_by_hash(files: List[FileMeta]) -> List[List[FileMeta]]:
     buckets: Dict[str, List[FileMeta]] = {}
     for f in files:
         if f.sha256:
             buckets.setdefault(f.sha256, []).append(f)
     return [v for v in buckets.values() if len(v) > 1]
+
 
 def pick_reference(candidates: List[FileMeta]) -> FileMeta:
     def score(f: FileMeta) -> Tuple[int, float]:
@@ -209,7 +283,9 @@ def pick_reference(candidates: List[FileMeta]) -> FileMeta:
         except Exception:
             ts = 0.0
         return (in_api, ts)
+
     return sorted(candidates, key=score, reverse=True)[0]
+
 
 # ---------- Markdown rendering ----------
 def human_size(n: int) -> str:
@@ -223,13 +299,14 @@ def human_size(n: int) -> str:
         return f"{int(f)} {units[i]}"
     return f"{f:.2f} {units[i]}"
 
+
 def render_markdown(
     root_label: str,
     files: List[FileMeta],
     folders: Dict[str, FolderStats],
     ignored_count: int,
     depth: int,
-    max_top: int
+    max_top: int,
 ) -> str:
     now = datetime.now().isoformat(timespec="seconds")
     total_files = len(files)
@@ -238,7 +315,11 @@ def render_markdown(
 
     tree_root = build_tree(files)
     tree_lines = render_tree(tree_root, folders, 0, depth)
-    tree_text = "```\n" + "\n".join(tree_lines) + "\n```" if tree_lines else "_Aucun sous-dossier visible à cette profondeur._"
+    tree_text = (
+        "```\n" + "\n".join(tree_lines) + "\n```"
+        if tree_lines
+        else "_Aucun sous-dossier visible à cette profondeur._"
+    )
 
     top_files = sorted(files, key=lambda f: f.size, reverse=True)[:max_top]
     dup_name_groups = group_duplicates_by_name(files)
@@ -264,13 +345,17 @@ def render_markdown(
         "duplicates_by_name": [[asdict(x) for x in grp] for grp in dup_name_groups],
         "duplicates_by_hash": [[asdict(x) for x in grp] for grp in dup_hash_groups],
     }
-    json_block = "```json\n" + json.dumps(json_payload, ensure_ascii=False, separators=(",", ":")) + "\n```"
+    json_block = (
+        "```json\n"
+        + json.dumps(json_payload, ensure_ascii=False, separators=(",", ":"))
+        + "\n```"
+    )
 
     md = []
-    md.append(f"# Audit nox-api-src")
+    md.append("# Audit nox-api-src")
     md.append("")
     md.append(f"**Date**: {now}  ")
-    md.append(f"**Racine analysée**: `nox-api-src/`  ")
+    md.append("**Racine analysée**: `nox-api-src/`  ")
     md.append("")
     md.append("## Résumé")
     md.append("")
@@ -308,7 +393,9 @@ def render_markdown(
         md.append("| Path | Size | Ext | MTime | SHA256 |")
         md.append("| --- | ---: | --- | --- | --- |")
         for f in sorted(lst, key=lambda x: x.path.lower()):
-            md.append(f"| `{f.path}` | {f.size} | `{f.ext}` | {f.mtime} | `{f.sha256 or ''}` |")
+            md.append(
+                f"| `{f.path}` | {f.size} | `{f.ext}` | {f.mtime} | `{f.sha256 or ''}` |"
+            )
         md.append("")
 
     md.append("## Doublons par nom")
@@ -341,18 +428,32 @@ def render_markdown(
     md.append("")
     md.append("## Redondances de structure et configs")
     md.append("")
-    md.append("- Vérifier la présence de dossiers proches comme `api`, `api-old`, `api_backup`, `archive`.")
-    md.append("- Vérifier la duplication potentielle de modules entre `ai/`, `api/`, `scripts/`.")
-    md.append("- Vérifier les configs multiples et chevauchantes: `pyproject.toml`, `setup.cfg`, `ruff.toml`, `.flake8`, `tsconfig.json`, `package.json`.")
+    md.append(
+        "- Vérifier la présence de dossiers proches comme `api`, `api-old`, `api_backup`, `archive`."
+    )
+    md.append(
+        "- Vérifier la duplication potentielle de modules entre `ai/`, `api/`, `scripts/`."
+    )
+    md.append(
+        "- Vérifier les configs multiples et chevauchantes: `pyproject.toml`, `setup.cfg`, `ruff.toml`, `.flake8`, `tsconfig.json`, `package.json`."
+    )
 
     md.append("")
     md.append("## Recommandations de nettoyage (non destructif)")
     md.append("")
     md.append("1. Geler l'état actuel dans une branche ou un tag.")
-    md.append("2. Écrire des tests rapides pour valider imports et endpoints critiques.")
-    md.append("3. Consolider les duplications par nom ou par hash en gardant la référence la plus récente située dans `api/` si pertinent.")
-    md.append("4. Déplacer artefacts, logs et caches vers `artifacts/` ou les ignorer via VCS.")
-    md.append("5. Unifier les configurations redondantes et centraliser les scripts dans `scripts/`.")
+    md.append(
+        "2. Écrire des tests rapides pour valider imports et endpoints critiques."
+    )
+    md.append(
+        "3. Consolider les duplications par nom ou par hash en gardant la référence la plus récente située dans `api/` si pertinent."
+    )
+    md.append(
+        "4. Déplacer artefacts, logs et caches vers `artifacts/` ou les ignorer via VCS."
+    )
+    md.append(
+        "5. Unifier les configurations redondantes et centraliser les scripts dans `scripts/`."
+    )
     md.append("")
     md.append("Arborescence cible suggérée:")
     md.append("```")
@@ -372,7 +473,9 @@ def render_markdown(
     md.append("- Exclusions extensions: " + ", ".join(sorted(EXCLUDED_EXTS)))
     md.append("- Extensions hashées: " + ", ".join(sorted(HASHABLE_EXTS)))
     md.append("- Taille dossier = somme des tailles des fichiers du sous-arbre.")
-    md.append("- Doublons par nom: groupement insensible à la casse sur le nom de fichier.")
+    md.append(
+        "- Doublons par nom: groupement insensible à la casse sur le nom de fichier."
+    )
     md.append("- Doublons par hash: groupement sur SHA256 des fichiers texte/code.")
 
     md.append("")
@@ -385,24 +488,48 @@ def render_markdown(
     md.append("")
     md.append("- [ ] Tous les chemins listés existent dans `nox-api-src/`.")
     md.append("- [ ] Recalculer 3 SHA256 au hasard et comparer avec le tableau.")
-    md.append("- [ ] Les recommandations n'impliquent pas de suppression sans sauvegarde.")
+    md.append(
+        "- [ ] Les recommandations n'impliquent pas de suppression sans sauvegarde."
+    )
     md.append("- [ ] Les dossiers exclus n'apparaissent pas dans l'inventaire.")
-    md.append("- [ ] Les imports et endpoints critiques passent les tests après consolidation.")
-    md.append("- [ ] Les chemins relatifs restent valides après tout mouvement suggéré.")
+    md.append(
+        "- [ ] Les imports et endpoints critiques passent les tests après consolidation."
+    )
+    md.append(
+        "- [ ] Les chemins relatifs restent valides après tout mouvement suggéré."
+    )
 
     return "\n".join(md)
 
+
 # ---------- Main ----------
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Audit nox-api-src et écrire un rapport Markdown.")
-    parser.add_argument("--root", type=str, default=None,
-                        help="Chemin explicite vers nox-api-src (doit être le dossier lui-même).")
-    parser.add_argument("--depth", type=int, default=6, help="Profondeur max de l'arbre.")
-    parser.add_argument("--max-top", type=int, default=50, help="Top N plus gros fichiers.")
-    parser.add_argument("--no-hash", action="store_true",
-                        help="Désactivé (compat rétro) — les hash sont déjà conditionnés par extensions.")
-    parser.add_argument("--reports-dir", type=str, default=None,
-                        help="Chemin vers le dossier reports existant (par défaut: <repo_root>/reports).")
+    parser = argparse.ArgumentParser(
+        description="Audit nox-api-src et écrire un rapport Markdown."
+    )
+    parser.add_argument(
+        "--root",
+        type=str,
+        default=None,
+        help="Chemin explicite vers nox-api-src (doit être le dossier lui-même).",
+    )
+    parser.add_argument(
+        "--depth", type=int, default=6, help="Profondeur max de l'arbre."
+    )
+    parser.add_argument(
+        "--max-top", type=int, default=50, help="Top N plus gros fichiers."
+    )
+    parser.add_argument(
+        "--no-hash",
+        action="store_true",
+        help="Désactivé (compat rétro) — les hash sont déjà conditionnés par extensions.",
+    )
+    parser.add_argument(
+        "--reports-dir",
+        type=str,
+        default=None,
+        help="Chemin vers le dossier reports existant (par défaut: <repo_root>/reports).",
+    )
     args = parser.parse_args()
 
     repo_root = Path.cwd()
@@ -411,31 +538,44 @@ def main() -> None:
     if args.root:
         target = Path(args.root).resolve()
         if not target.is_dir() or target.name != TARGET_DIRNAME:
-            fail(f"--root doit pointer vers le dossier '{TARGET_DIRNAME}' lui-même: {target}")
+            fail(
+                f"--root doit pointer vers le dossier '{TARGET_DIRNAME}' lui-même: {target}"
+            )
     else:
         target = find_nox_api_src(repo_root)
 
     ok(f"Racine d'analyse: {target}")
 
     # Résoudre le dossier reports (ne jamais créer)
-    reports_dir = Path(args.reports_dir).resolve() if args.reports_dir else (repo_root / "reports")
+    reports_dir = (
+        Path(args.reports_dir).resolve()
+        if args.reports_dir
+        else (repo_root / "reports")
+    )
     if not reports_dir.is_dir():
-        fail(f"Le dossier reports n'existe pas: {reports_dir}. Crée-le manuellement pour éviter les doublons.")
+        fail(
+            f"Le dossier reports n'existe pas: {reports_dir}. Crée-le manuellement pour éviter les doublons."
+        )
     report_path = reports_dir / "nox_api_src_audit.md"
 
     ok("Scan des fichiers…")
     files, folders, ignored = scan_directory(target)
 
     ok("Génération du rapport…")
-    md = render_markdown("nox-api-src", files, folders, ignored, depth=args.depth, max_top=args.max_top)
+    md = render_markdown(
+        "nox-api-src", files, folders, ignored, depth=args.depth, max_top=args.max_top
+    )
 
     ok(f"Écriture: {report_path}")
     report_path.write_text(md, encoding="utf-8")
 
     # Résumé console
     total_size = sum(f.size for f in files)
-    ok(f"Terminé. Fichiers: {len(files)}, Dossiers: {len([k for k in folders if k != '.'])}, "
-       f"Ignorés: {ignored}, Taille: {total_size} B")
+    ok(
+        f"Terminé. Fichiers: {len(files)}, Dossiers: {len([k for k in folders if k != '.'])}, "
+        f"Ignorés: {ignored}, Taille: {total_size} B"
+    )
+
 
 if __name__ == "__main__":
     main()

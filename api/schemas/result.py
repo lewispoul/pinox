@@ -1,11 +1,13 @@
 from pydantic import BaseModel
 from typing import Dict, List
 
+
 class Artifact(BaseModel):
     name: str
     path: str
     mime: str = "application/octet-stream"
     size: int
+
 
 class ResultBundle(BaseModel):
     scalars: Dict[str, float] = {}

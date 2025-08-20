@@ -19,6 +19,10 @@ python-decouple>=3.8
 authlib>=1.2.1
 httpx>=0.25.2
 
+# Task queue and background jobs
+dramatiq>=1.13.0
+redis>=4.5.0
+
 # System & Process Management
 psutil>=5.9.6
 docker>=6.1.3

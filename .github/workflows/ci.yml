@@ -57,20 +57,13 @@ jobs:
     
     - name: Run tests
       run: |
-        python -m pytest tests/ -v --cov=nox --cov-report=xml || echo "Some tests failed but continuing"
+        python -m pytest tests/ -v
       env:
         DATABASE_URL: postgresql://test_user:test_password@localhost:5432/nox_test
         JWT_SECRET_KEY: test_secret_key_for_ci
         NOX_API_HOST: "0.0.0.0"
         NOX_API_PORT: "8000"
     
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
-      if: always()
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
-
   build:
     needs: test
     runs-on: ubuntu-latest

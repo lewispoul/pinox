@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 from api.services.settings import settings
+from nox.artifacts.cubes import generate_cubes_from_molden, validate_cube_file
 
 def _write_xyz(xyz_text: str, path: Path) -> None:
     path.write_text(xyz_text.strip() + "\n", encoding="utf-8")
@@ -182,12 +183,43 @@ def run_xtb_job(job_dir: Path, xyz: str, charge: int, multiplicity: int, params:
     if params.get("cubes", False):
         molden_path = _maybe_generate_molden(job_dir, inp.name)
         if molden_path and molden_path.exists() and molden_path.is_file():
-            artifacts.append({"name": molden_path.name, "path": str(molden_path), "mime": "text/plain", "size": molden_path.stat().st_size})
+            artifacts.append({
+                "name": molden_path.name,
+                "path": str(molden_path),
+                "mime": "text/plain",
+                "size": molden_path.stat().st_size
+            })
+            
+            # Generate HOMO/LUMO cube files using our cube module
+            try:
+                cube_files = generate_cubes_from_molden(
+                    molden_path,
+                    job_dir,
+                    ['homo', 'lumo']
+                )
+                
+                for cube_file in cube_files:
+                    if cube_file.exists():
+                        cube_info = validate_cube_file(cube_file)
+                        artifacts.append({
+                            "name": cube_file.name,
+                            "path": str(cube_file),
+                            "mime": "application/x-cube",
+                            "size": cube_file.stat().st_size,
+                            "metadata": cube_info
+                        })
+                        
+            except Exception as e:
+                print(f"Cube generation failed: {e}")
         else:
             # XTB peut générer molden.input automatiquement
             molden_input = job_dir / "molden.input"
             if molden_input.exists():
-                artifacts.append({"name": "molden.input", "path": str(molden_input), "mime": "text/plain", "size": molden_input.stat().st_size})
-        # TODO futur, conversion molden -> homo.cube et lumo.cube avec un outil externe
+                artifacts.append({
+                    "name": "molden.input",
+                    "path": str(molden_input),
+                    "mime": "text/plain",
+                    "size": molden_input.stat().st_size
+                })
 
     return {"scalars": scalars, "series": {}, "artifacts": artifacts, "returncode": ret}

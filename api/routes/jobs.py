@@ -1,73 +1,110 @@
-import uuid
-from fastapi import APIRouter, HTTPException
+from __future__ import annotations
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, ValidationError
+from typing import Any, Dict
+from api.services.queue import submit_job
+from api.services.jobs_store import get_store
 from api.schemas.job import JobRequest, JobStatus
 from api.schemas.result import ResultBundle, Artifact
-from api.services.storage import job_dir
-from api.services.queue import broker  # noqa: F401
-import dramatiq
-from ai.runners.xtb import run_xtb_job
 
 router = APIRouter()
-JOBS = {}  # { job_id: {"state": str, "message": str, "result": dict|None} }
 
-@dramatiq.actor
-def run_job(job_id: str, req_json: str):
-    """Dramatiq actor to execute XTB calculations"""
+
+class SimpleJobRequest(BaseModel):
+    kind: str = "echo"
+    payload: Dict[str, Any] = {}
+
+
+@router.post("/jobs")
+async def create_job(request: Request):
+    """Create a job - supports both simple and XTB job formats"""
     try:
-        JR = JobRequest.model_validate_json(req_json)
-        JOBS[job_id]["state"] = "running"
-        JOBS[job_id]["message"] = "XTB calculation in progress"
+        # Try to parse as raw dict first
+        body = await request.json()
         
-        jd = job_dir(job_id)
-        result = run_xtb_job(
-            jd,
-            JR.inputs.xyz,
-            JR.inputs.charge,
-            JR.inputs.multiplicity,
-            JR.inputs.params.model_dump(),
-        )
+        # Check if it looks like a simple job request (has 'kind' field)
+        if "kind" in body and "payload" in body:
+            # Simple job request
+            simple_req = SimpleJobRequest(**body)
+            job_id = submit_job(simple_req.kind, simple_req.payload)
+            j = get_store().get(job_id)
+            if j is None:
+                raise HTTPException(500, "Failed to create job")
+            return {"job_id": job_id, "state": j.state}
         
-        # Store result and update state
-        JOBS[job_id]["result"] = result
-        # XTB success: return code 0 OR (return code 2 with valid energy results)
-        has_energy = result.get("scalars", {}).get("E_total_hartree") is not None
-        success = (result.get("returncode") == 0) or (result.get("returncode") == 2 and has_energy)
-        
-        if success:
-            JOBS[job_id]["state"] = "completed"
-            JOBS[job_id]["message"] = "XTB calculation completed successfully"
-        else:
-            JOBS[job_id]["state"] = "failed"  
-            JOBS[job_id]["message"] = f"XTB calculation failed with return code {result.get('returncode')}"
+        # Otherwise try to parse as XTB JobRequest
+        try:
+            xtb_req = JobRequest(**body)
+            payload = {
+                "job_request": xtb_req.model_dump_json()
+            }
+            job_id = submit_job("xtb", payload)
+            
+            return JobStatus(
+                job_id=job_id,
+                state="pending",
+                message="Job queued for processing"
+            )
+        except ValidationError:
+            raise HTTPException(422, "Invalid job request format")
             
     except Exception as e:
-        JOBS[job_id]["state"] = "failed"
-        JOBS[job_id]["message"] = str(e)
+        raise HTTPException(400, f"Invalid request: {str(e)}")
 
-@router.post("/jobs", response_model=JobStatus)
-def create_job(req: JobRequest):
-    """Create a new XTB job and queue it for processing"""
-    job_id = uuid.uuid4().hex
-    JOBS[job_id] = {"state": "pending", "message": "Job queued for processing", "result": None}
-    run_job.send(job_id, req.model_dump_json())
-    return JobStatus(job_id=job_id, state="pending", message="Job queued for processing")
 
-@router.get("/jobs/{job_id}", response_model=JobStatus)
-def get_job(job_id: str):
-    """Get job status and current state"""
-    j = JOBS.get(job_id)
+@router.post("/jobs/simple")
+def create_simple_job(req: SimpleJobRequest):
+    """Create a simple job (echo, etc.) - legacy endpoint"""
+    job_id = submit_job(req.kind, req.payload)
+    j = get_store().get(job_id)
+    if j is None:
+        raise HTTPException(500, "Failed to create job")
+    return {"job_id": job_id, "state": j.state}
+
+
+@router.get("/jobs/{job_id}")
+def get_job_simple(job_id: str):
+    """Get job status (raw format) - primary endpoint for simple jobs"""
+    j = get_store().get(job_id)
+    if not j:
+        raise HTTPException(404, detail="Job not found")
+    # Convert id to job_id for consistency
+    result = j.to_dict()
+    if "id" in result:
+        result["job_id"] = result.pop("id")
+    return result
+
+
+@router.get("/jobs/{job_id}/status", response_model=JobStatus)
+def get_job_status(job_id: str):
+    """Get job status (JobStatus format with state mapping)"""
+    j = get_store().get(job_id)
     if not j:
         raise HTTPException(404, "Job not found")
-    return JobStatus(job_id=job_id, state=j["state"], message=j.get("message", ""))
+    
+    # Map our job states to the expected states
+    state_mapping = {
+        "queued": "pending",
+        "running": "running",
+        "done": "completed",
+        "failed": "failed"
+    }
+    
+    return JobStatus(
+        job_id=job_id,
+        state=state_mapping.get(j.state, j.state),
+        message=j.error or "Job processing"
+    )
+
 
 @router.get("/jobs/{job_id}/artifacts", response_model=ResultBundle)
 def get_artifacts(job_id: str):
     """Get job results and artifacts if calculation is completed"""
-    j = JOBS.get(job_id)
-    if not j or j["state"] != "completed" or j["result"] is None:
+    j = get_store().get(job_id)
+    if not j or j.state != "done" or not j.result:
         raise HTTPException(404, "Result not available")
     
-    rb = j["result"]
+    rb = j.result
     
     # Convert dict artifacts to Artifact objects for proper validation
     artifacts = []
@@ -75,7 +112,7 @@ def get_artifacts(job_id: str):
         artifacts.append(Artifact(**art_dict))
     
     return ResultBundle(
-        scalars=rb.get("scalars", {}), 
-        series=rb.get("series", {}), 
+        scalars=rb.get("scalars", {}),
+        series=rb.get("series", {}),
         artifacts=artifacts
     )

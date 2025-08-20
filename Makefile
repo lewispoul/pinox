@@ -1,16 +1,49 @@
-# Makefile for Nox API XTB Integration
-# Development and deployment automation
+# ---- NOX API XTB Dev Workflow ----
+PYTHONPATH := $(shell pwd)
+APP := api.main:app
+HOST := 127.0.0.1
+PORT := 8000
 
-.PHONY: run worker test redis help clean status logs
+LOG_DIR := .logs
+RUN_DIR := .run
+API_PID := $(RUN_DIR)/api.pid
 
-# Development targets for XTB API
-run:  ## Run API server on port 8080
+# ---- helpers ----
+_init:
+	@mkdir -p $(LOG_DIR) $(RUN_DIR)
+
+# ---- API (new dev workflow) ----
+api-start: _init
+	@echo "Starting API on $(HOST):$(PORT)…"
+	@(PYTHONPATH=$(PYTHONPATH) uvicorn $(APP) --host $(HOST) --port $(PORT) --reload \
+		> $(LOG_DIR)/api.log 2>&1 & echo $$! > $(API_PID))
+	@echo "API PID: $$(cat $(API_PID))  (logs: $(LOG_DIR)/api.log)"
+
+api-stop:
+	@if [ -f $(API_PID) ]; then \
+		echo "Stopping API PID $$(cat $(API_PID))"; \
+		kill $$(cat $(API_PID)) || true; \
+		rm -f $(API_PID); \
+	else echo "API not running"; fi
+
+api-logs:
+	@tail -f $(LOG_DIR)/api.log
+
+# ---- tests ----
+test:
+	@PYTHONPATH=$(PYTHONPATH) pytest -q
+
+# ---- Legacy XTB targets (preserved) ----
+.PHONY: run worker redis help clean status logs install harden caddy-lan caddy-public nginx-public repair repair-v2 validate demo logs install-logs debug api-start api-stop api-logs _init
+
+run:  ## Run API server on port 8080 (legacy)
+	PYTHONPATH=. python -m uvicorn api.main:app --reload --port 8080
 	PYTHONPATH=. python -m uvicorn api.main:app --reload --port 8080
 
 worker:  ## Run Dramatiq worker for background jobs
 	python -m dramatiq api.routes.jobs --processes 1 --threads 1
 
-test:  ## Run pytest test suite
+legacy-test:  ## Run pytest test suite (legacy)
 	PYTHONPATH=. python -m pytest -q
 
 redis:  ## Start Redis server in daemon mode

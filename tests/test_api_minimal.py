@@ -12,7 +12,18 @@ async def test_health():
         assert resp.json() == {"status": "ok"}
 
 @pytest.mark.asyncio
-async def test_jobs_flow():
+async def test_jobs_flow(monkeypatch):
+    # Force Redis mode with FakeRedis for predictable Dramatiq behavior
+    import fakeredis
+    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
+    
+    # Mock Redis client creation to use FakeRedis
+    import redis
+    original_from_url = redis.from_url
+    def fake_redis_from_url(url, **kwargs):
+        return fakeredis.FakeStrictRedis.from_url(url, **kwargs)
+    monkeypatch.setattr(redis, "from_url", fake_redis_from_url)
+    
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. POST /jobs
@@ -29,14 +40,14 @@ async def test_jobs_flow():
         assert resp.status_code == 200
         job = resp.json()
         assert "job_id" in job
-        assert job["state"] == "pending"  # Job is now queued with Dramatiq
+        assert job["state"] == "pending"  # POST returns JobStatus format
         job_id = job["job_id"]
 
         # 2. GET /jobs/{job_id}
         resp2 = await ac.get(f"/jobs/{job_id}")
         assert resp2.status_code == 200
         job2 = resp2.json()
-        assert job2["state"] == "pending"  # Job remains pending until Dramatiq worker processes it
+        assert job2["state"] == "queued"  # GET returns raw job state
         assert job2["job_id"] == job_id
 
         # 3. GET /jobs/{job_id}/artifacts - Should return 404 for pending jobs

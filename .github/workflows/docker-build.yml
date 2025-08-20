@@ -42,12 +42,20 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-asyncio pytest-cov httpx
+        if [ -f dev-requirements.txt ]; then
+          pip install -r dev-requirements.txt
+        else
+          pip install pytest pytest-asyncio pytest-cov httpx
+        fi
     
     - name: Initialize test database
       run: |
         export DATABASE_URL="postgresql://test_user:test_password@localhost:5432/nox_test"
-        psql $DATABASE_URL -f scripts/init-db.sql
+        if [ -f scripts/init-db.sql ]; then
+          psql $DATABASE_URL -f scripts/init-db.sql
+        else
+          echo "No init-db.sql found, skipping database initialization"
+        fi
       env:
         PGPASSWORD: test_password
     

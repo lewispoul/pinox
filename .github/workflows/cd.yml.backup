@@ -96,68 +96,6 @@ jobs:
           Commit: ${{ github.sha }}
           Status: ${{ job.status }}
           Features: AI Integration, Multi-node Support, Enhanced UX
-        description: 'Image version to deploy'
-        required: false
-        default: 'latest'
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/nox-api
-
-jobs:
-  # ===== STAGING DEPLOYMENT =====
-  deploy-staging:
-    name: Deploy to Staging
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && (github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch')
-    environment: staging
-    
-    steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
-
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
-
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
-
-    - name: Deploy to ECS Staging
-      run: |
-        # Update ECS service with new image
-        aws ecs update-service \
-          --cluster nox-staging-cluster \
-          --service nox-api-staging \
-          --task-definition nox-api-staging:LATEST \
-          --force-new-deployment
-        
-        # Wait for deployment to complete
-        aws ecs wait services-stable \
-          --cluster nox-staging-cluster \
-          --services nox-api-staging
-
-    - name: Run Staging Smoke Tests
-      run: |
-        sleep 30
-        curl -f ${{ secrets.STAGING_API_URL }}/api/v7/auth/health
-        curl -f ${{ secrets.STAGING_API_URL }}/api/v7/status
-
-    - name: Notify Staging Deployment
-      uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        channel: '#deployments'
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-        message: |
-          🚀 Nox API v7.0.0 deployed to STAGING
-          Environment: staging
-          Commit: ${{ github.sha }}
-          Status: ${{ job.status }}
 
   # ===== PRODUCTION DEPLOYMENT =====  
   deploy-production:
@@ -175,7 +113,7 @@ jobs:
       uses: trstringer/manual-approval@v1
       if: github.event_name != 'workflow_dispatch'
       with:
-        secret: ${{ github.TOKEN }}
+        secret: ${{ secrets.GITHUB_TOKEN }}
         approvers: ${{ secrets.PRODUCTION_APPROVERS }}
         minimum-approvals: 2
         issue-title: "Deploy Nox API v7.0.0 to Production"

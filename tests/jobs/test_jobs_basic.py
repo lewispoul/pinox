@@ -30,8 +30,8 @@ async def test_job_creation():
                 "xyz": "2\nH2\nH 0 0 0\nH 0 0 0.74\n",
                 "charge": 0,
                 "multiplicity": 1,
-                "params": {"cubes": False}
-            }
+                "params": {"cubes": False},
+            },
         }
 
         response = await ac.post("/jobs", json=job_request)
@@ -61,8 +61,8 @@ async def test_job_status_polling():
             "inputs": {
                 "xyz": "2\nH2\nH 0 0 0\nH 0 0 0.74\n",
                 "charge": 0,
-                "multiplicity": 1
-            }
+                "multiplicity": 1,
+            },
         }
 
         create_response = await ac.post("/jobs", json=job_request)
@@ -104,8 +104,8 @@ async def test_artifacts_not_ready():
             "inputs": {
                 "xyz": "2\nH2\nH 0 0 0\nH 0 0 0.74\n",
                 "charge": 0,
-                "multiplicity": 1
-            }
+                "multiplicity": 1,
+            },
         }
 
         create_response = await ac.post("/jobs", json=job_request)
@@ -130,8 +130,8 @@ async def test_job_with_cube_generation():
                 "xyz": "2\nH2\nH 0 0 0\nH 0 0 0.74\n",
                 "charge": 0,
                 "multiplicity": 1,
-                "params": {"cubes": True}  # Enable cube generation
-            }
+                "params": {"cubes": True},  # Enable cube generation
+            },
         }
 
         response = await ac.post("/jobs", json=job_request)

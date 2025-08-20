@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+
 class XTBParams(BaseModel):
     gfn: int = 2
     opt: bool = True
@@ -9,16 +10,19 @@ class XTBParams(BaseModel):
     json_output: bool = True
     cubes: bool = False
 
+
 class JobInputs(BaseModel):
     xyz: str
     charge: int = 0
     multiplicity: int = 1
     params: XTBParams = XTBParams()
 
+
 class JobRequest(BaseModel):
     engine: str = "xtb"
     kind: str = "opt_properties"
     inputs: JobInputs
+
 
 class JobStatus(BaseModel):
     job_id: str

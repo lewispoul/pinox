@@ -14,54 +14,53 @@ from typing import Dict, List, Optional, Any
 
 class CubeGenerationError(Exception):
     """Raised when cube file generation fails."""
+
     pass
 
 
 def find_cube_tools() -> Dict[str, Optional[str]]:
     """Find available tools for cube generation."""
     tools = {}
-    
+
     # Common tools for cube generation
     candidates = [
-        "multiwfn",      # MultiWFN - versatile wavefunction analysis
-        "cubegen",       # Gaussian cubegen utility
-        "molden2aim",    # Molden to various formats converter
-        "xtb",           # XTB might support direct cube generation
+        "multiwfn",  # MultiWFN - versatile wavefunction analysis
+        "cubegen",  # Gaussian cubegen utility
+        "molden2aim",  # Molden to various formats converter
+        "xtb",  # XTB might support direct cube generation
     ]
-    
+
     for tool in candidates:
         tools[tool] = shutil.which(tool)
-    
+
     return tools
 
 
 def generate_cubes_from_molden(
-        molden_path: Path,
-        output_dir: Path,
-        cube_types: Optional[List[str]] = None
+    molden_path: Path, output_dir: Path, cube_types: Optional[List[str]] = None
 ) -> List[Path]:
     """
     Generate cube files from Molden format using available tools.
-    
+
     Args:
         molden_path: Path to the Molden file
         output_dir: Directory to write cube files
         cube_types: Types of cubes to generate ['homo', 'lumo', 'density', etc.]
-    
+
     Returns:
         List of generated cube file paths
     """
     if cube_types is None:
-        cube_types = ['homo', 'lumo']
-    
+        cube_types = ["homo", "lumo"]
+
     if not molden_path.exists():
         raise FileNotFoundError(f"Molden file not found: {molden_path}")
-    
+
     output_dir.mkdir(parents=True, exist_ok=True)
     generated_cubes = []
-    
+
     tools = find_cube_tools()
-    
+
     # Try MultiWFN first (most versatile)
     if tools.get("multiwfn"):
         try:
@@ -69,7 +68,7 @@ def generate_cubes_from_molden(
             generated_cubes.extend(cubes)
         except Exception as e:
             print(f"MultiWFN cube generation failed: {e}")
-    
+
     # Fallback: try other methods
     if not generated_cubes and tools.get("xtb"):
         try:
@@ -77,26 +76,27 @@ def generate_cubes_from_molden(
             generated_cubes.extend(cubes)
         except Exception as e:
             print(f"XTB direct cube generation failed: {e}")
-    
+
     # If no tools available, create placeholder cubes for testing
     if not generated_cubes and not any(tools.values()):
         print("No cube generation tools found, creating placeholder cubes for testing")
         cubes = _create_placeholder_cubes(output_dir, cube_types)
         generated_cubes.extend(cubes)
-    
+
     return generated_cubes
 
 
-def _generate_cubes_multiwfn(molden_path: Path, output_dir: Path, 
-                            cube_types: List[str]) -> List[Path]:
+def _generate_cubes_multiwfn(
+    molden_path: Path, output_dir: Path, cube_types: List[str]
+) -> List[Path]:
     """Generate cubes using MultiWFN."""
     cubes = []
-    
+
     # MultiWFN can generate molecular orbitals from Molden files
     # This is a simplified implementation - real MultiWFN requires interactive input
     for cube_type in cube_types:
         cube_file = output_dir / f"{cube_type}.cube"
-        
+
         # For now, create a command template that would work with MultiWFN
         # In practice, this would require scripted input to MultiWFN
         try:
@@ -105,43 +105,44 @@ def _generate_cubes_multiwfn(molden_path: Path, output_dir: Path,
             # 2. Choose orbital visualization
             # 3. Select HOMO/LUMO
             # 4. Generate cube
-            
+
             # Placeholder - actual implementation would run MultiWFN with scripted input
             # cmd = f"multiwfn {molden_path}"
             # This is complex to automate, so for now we'll use other methods
             pass
-            
+
         except Exception as e:
             raise CubeGenerationError(f"MultiWFN cube generation failed: {e}")
-    
+
     return cubes
 
 
-def _generate_cubes_xtb_direct(molden_path: Path, output_dir: Path,
-                              cube_types: List[str]) -> List[Path]:
+def _generate_cubes_xtb_direct(
+    molden_path: Path, output_dir: Path, cube_types: List[str]
+) -> List[Path]:
     """Try to generate cubes directly with XTB (if supported)."""
     cubes = []
-    
+
     # Some versions of XTB might support direct cube generation
     # This is experimental functionality
     for cube_type in cube_types:
         cube_file = output_dir / f"{cube_type}.cube"
-        
+
         try:
             # XTB cube generation is version-dependent and not always available
             # This is a placeholder for future XTB cube capabilities
             pass
-            
+
         except Exception as e:
             raise CubeGenerationError(f"XTB direct cube generation failed: {e}")
-    
+
     return cubes
 
 
 def _create_placeholder_cubes(output_dir: Path, cube_types: List[str]) -> List[Path]:
     """Create placeholder cube files for testing when no tools are available."""
     cubes = []
-    
+
     # Standard cube file header format
     cube_header = """Test molecule cube file generated by NOX
 HOMO/LUMO orbital cube for visualization
@@ -152,62 +153,62 @@ HOMO/LUMO orbital cube for visualization
     1    1.000000    0.000000    0.000000    0.000000
     1    1.000000    2.000000    0.000000    0.000000
 """
-    
+
     for cube_type in cube_types:
         cube_file = output_dir / f"{cube_type}.cube"
-        
+
         # Create a minimal but valid cube file for testing
         cube_content = cube_header
-        
+
         # Add some minimal volumetric data (very small grid for testing)
         for i in range(10):  # Small 10x10x10 grid instead of 40x40x40
             for j in range(10):
                 for k in range(10):
                     # Simple mathematical function for orbital-like shape
-                    x, y, z = i-5, j-5, k-5
-                    r = (x*x + y*y + z*z)**0.5
-                    if cube_type == 'homo':
+                    x, y, z = i - 5, j - 5, k - 5
+                    r = (x * x + y * y + z * z) ** 0.5
+                    if cube_type == "homo":
                         value = 0.1 * (1.0 / (1.0 + r)) if r > 0 else 0.1
                     else:  # lumo
-                        value = 0.05 * (1.0 / (1.0 + r*r)) if r > 0 else 0.05
-                    
+                        value = 0.05 * (1.0 / (1.0 + r * r)) if r > 0 else 0.05
+
                     cube_content += f"  {value:12.6e}"
                     if (k + 1) % 6 == 0:  # Line break every 6 values
                         cube_content += "\n"
                 cube_content += "\n"
             cube_content += "\n"
-        
+
         cube_file.write_text(cube_content)
         cubes.append(cube_file)
-    
+
     return cubes
 
 
 def validate_cube_file(cube_path: Path) -> Dict[str, Any]:
     """
     Validate and extract metadata from a cube file.
-    
+
     Returns:
         Dictionary with cube file information (atoms, grid size, etc.)
     """
     if not cube_path.exists():
         raise FileNotFoundError(f"Cube file not found: {cube_path}")
-    
+
     try:
-        lines = cube_path.read_text().strip().split('\n')
-        
+        lines = cube_path.read_text().strip().split("\n")
+
         # Parse cube header
         if len(lines) < 6:
             raise ValueError("Invalid cube file: too few header lines")
-        
+
         # Line 0-1: Comments
         comment1, comment2 = lines[0], lines[1]
-        
+
         # Line 2: Number of atoms and origin
         natoms_line = lines[2].split()
         natoms = int(natoms_line[0])
         origin = [float(x) for x in natoms_line[1:4]]
-        
+
         # Lines 3-5: Grid vectors
         grid_info = []
         for i in range(3, 6):
@@ -215,33 +216,33 @@ def validate_cube_file(cube_path: Path) -> Dict[str, Any]:
             npoints = int(parts[0])
             vector = [float(x) for x in parts[1:4]]
             grid_info.append((npoints, vector))
-        
+
         return {
-            'valid': True,
-            'natoms': natoms,
-            'origin': origin,
-            'grid_points': [g[0] for g in grid_info],
-            'grid_vectors': [g[1] for g in grid_info],
-            'comments': [comment1, comment2],
-            'file_size': cube_path.stat().st_size
+            "valid": True,
+            "natoms": natoms,
+            "origin": origin,
+            "grid_points": [g[0] for g in grid_info],
+            "grid_vectors": [g[1] for g in grid_info],
+            "comments": [comment1, comment2],
+            "file_size": cube_path.stat().st_size,
         }
-        
+
     except Exception as e:
         return {
-            'valid': False,
-            'error': str(e),
-            'file_size': cube_path.stat().st_size if cube_path.exists() else 0
+            "valid": False,
+            "error": str(e),
+            "file_size": cube_path.stat().st_size if cube_path.exists() else 0,
         }
 
 
 def get_cube_info(cube_path: Path) -> str:
     """Get human-readable information about a cube file."""
     info = validate_cube_file(cube_path)
-    
-    if not info['valid']:
+
+    if not info["valid"]:
         return f"Invalid cube file: {info.get('error', 'Unknown error')}"
-    
-    grid_desc = "x".join(str(n) for n in info['grid_points'])
-    size_mb = info['file_size'] / (1024 * 1024)
-    
+
+    grid_desc = "x".join(str(n) for n in info["grid_points"])
+    size_mb = info["file_size"] / (1024 * 1024)
+
     return f"Cube file: {info['natoms']} atoms, {grid_desc} grid, {size_mb:.2f} MB"

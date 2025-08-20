@@ -2,8 +2,10 @@ import json
 
 REQUIRED = ("energy", "homo_lumo_gap_ev", "dipole_debye")
 
+
 class XTBParseError(ValueError):
     pass
+
 
 def parse_xtbout_text(text: str) -> dict:
     """Parse xtbout.json text and normalize schema to {energy, gap, dipole}."""
@@ -17,7 +19,7 @@ def parse_xtbout_text(text: str) -> dict:
         raise XTBParseError(f"missing field(s): {', '.join(missing)}")
 
     return {
-        "energy": float(data["energy"]),                  # Hartree (Eh)
-        "gap": float(data["homo_lumo_gap_ev"]),           # eV
-        "dipole": float(data["dipole_debye"])             # Debye
+        "energy": float(data["energy"]),  # Hartree (Eh)
+        "gap": float(data["homo_lumo_gap_ev"]),  # eV
+        "dipole": float(data["dipole_debye"]),  # Debye
     }

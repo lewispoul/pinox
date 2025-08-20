@@ -1,11 +1,12 @@
 """
 Admin routes for quota management
 """
+
 from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from typing import List, Optional, Dict, Any
+from typing import Optional
 from datetime import datetime
 
-from .models import UserQuota, QuotaViolation
+from .models import UserQuota
 from .database import QuotaDatabase
 from .metrics import quota_metrics, get_quota_metrics_output
 
@@ -18,6 +19,7 @@ admin_router = APIRouter(prefix="/quotas/admin", tags=["quotas-admin"])
 # Router pour les endpoints utilisateur
 user_router = APIRouter(prefix="/quotas", tags=["quotas"])
 
+
 async def get_current_user_id(request: Request) -> str:
     """
     Extrait l'UUID utilisateur depuis le token Bearer.
@@ -26,17 +28,19 @@ async def get_current_user_id(request: Request) -> str:
     auth_header = request.headers.get("authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Token Bearer requis")
-    
+
     token = auth_header.replace("Bearer ", "").strip()
     if not token:
         raise HTTPException(status_code=401, detail="Token vide")
-    
+
     # Chercher l'utilisateur par oauth_id
     user = await quota_db.get_user_by_oauth_id(token)
     if not user:
-        raise HTTPException(status_code=404, detail=f"Utilisateur non trouvé pour le token")
-    
-    return str(user['id'])
+        raise HTTPException(
+            status_code=404, detail="Utilisateur non trouvé pour le token"
+        )
+
+    return str(user["id"])
 
 
 @admin_router.get("/users/{user_id}/quotas", response_model=UserQuota)
@@ -52,19 +56,19 @@ async def get_user_quotas(user_id: str):
 async def update_user_quotas(user_id: str, quotas: UserQuota):
     """Met à jour les quotas d'un utilisateur (admin seulement)"""
     quotas.user_id = user_id  # S'assurer que l'ID correspond
-    
+
     success = await quota_db.update_user_quotas(user_id, quotas)
     if not success:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # Mettre à jour les métriques Prometheus
     quota_metrics.update_quota_usage(
         user_id=user_id,
         quota_type="req_hour",
         current=0,  # On ne connaît pas l'usage actuel ici
-        limit=quotas.quota_req_hour
+        limit=quotas.quota_req_hour,
     )
-    
+
     return {"message": "Quotas updated successfully", "quotas": quotas}
 
 
@@ -72,7 +76,7 @@ async def update_user_quotas(user_id: str, quotas: UserQuota):
 async def get_quota_violations(
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
     hours: int = Query(24, description="Hours to look back"),
-    limit: int = Query(100, description="Maximum number of violations to return")
+    limit: int = Query(100, description="Maximum number of violations to return"),
 ):
     """Récupère les violations de quotas récentes (admin seulement)"""
     violations = await quota_db.get_quota_violations(user_id, hours, limit)
@@ -80,7 +84,7 @@ async def get_quota_violations(
         "violations": violations,
         "total": len(violations),
         "hours": hours,
-        "user_id": user_id
+        "user_id": user_id,
     }
 
 
@@ -88,10 +92,7 @@ async def get_quota_violations(
 async def get_usage_statistics():
     """Récupère les statistiques globales d'usage (admin seulement)"""
     stats = await quota_db.get_usage_statistics()
-    return {
-        "statistics": stats,
-        "timestamp": datetime.now().isoformat()
-    }
+    return {"statistics": stats, "timestamp": datetime.now().isoformat()}
 
 
 @admin_router.post("/reset/hourly")
@@ -114,7 +115,11 @@ async def cleanup_old_violations(
 ):
     """Nettoie les anciennes violations (admin seulement)"""
     result = await quota_db.cleanup_old_violations(days)
-    return {"message": f"Old violations cleaned up", "days": days, "affected_rows": result}
+    return {
+        "message": "Old violations cleaned up",
+        "days": days,
+        "affected_rows": result,
+    }
 
 
 # Endpoints utilisateur (accès avec authentification normale)
@@ -134,42 +139,46 @@ async def get_my_usage(current_user_id: str = Depends(get_current_user_id)):
     if not usage:
         # Créer un usage vide si pas trouvé
         from .models import UserUsage
+
         usage = UserUsage(user_id=current_user_id)
-    
+
     # Récupérer aussi les quotas pour calcul des pourcentages
     quotas = await quota_db.get_user_quotas(current_user_id)
-    
+
     result = {
         "usage": usage.to_dict() if usage else {},
         "quotas": quotas.to_dict() if quotas else {},
-        "percentages": {}
+        "percentages": {},
     }
-    
+
     # Calculer les pourcentages d'usage
     if quotas:
         result["percentages"] = {
             "req_hour": (usage.req_hour / max(quotas.quota_req_hour or 1, 1)) * 100,
             "req_day": (usage.req_day / max(quotas.quota_req_day or 1, 1)) * 100,
-            "cpu_seconds": (usage.cpu_seconds / max(quotas.quota_cpu_seconds or 1, 1)) * 100,
+            "cpu_seconds": (usage.cpu_seconds / max(quotas.quota_cpu_seconds or 1, 1))
+            * 100,
             "mem_mb": (usage.mem_peak_mb / max(quotas.quota_mem_mb or 1, 1)) * 100,
-            "storage_mb": (usage.storage_mb / max(quotas.quota_storage_mb or 1, 1)) * 100,
-            "files_count": (usage.files_count / max(quotas.quota_files_max or 1, 1)) * 100
+            "storage_mb": (usage.storage_mb / max(quotas.quota_storage_mb or 1, 1))
+            * 100,
+            "files_count": (usage.files_count / max(quotas.quota_files_max or 1, 1))
+            * 100,
         }
-    
+
     return result
 
 
 @user_router.get("/my/violations")
 async def get_my_violations(
     current_user_id: str = Depends(get_current_user_id),
-    hours: int = Query(24, description="Hours to look back")
+    hours: int = Query(24, description="Hours to look back"),
 ):
     """Récupère ses propres violations de quotas"""
     violations = await quota_db.get_quota_violations(current_user_id, hours)
     return {
-        "violations": [v.to_dict() if hasattr(v, 'to_dict') else v for v in violations],
+        "violations": [v.to_dict() if hasattr(v, "to_dict") else v for v in violations],
         "total": len(violations),
-        "hours": hours
+        "hours": hours,
     }
 
 
@@ -186,7 +195,9 @@ async def initialize_quota_system():
     try:
         # Tester la connexion à la base de données
         test_stats = await quota_db.get_usage_statistics()
-        print(f"✅ Quota system initialized - tracking {test_stats['total_users']} users")
+        print(
+            f"✅ Quota system initialized - tracking {test_stats['total_users']} users"
+        )
         return True
     except Exception as e:
         print(f"❌ Failed to initialize quota system: {e}")

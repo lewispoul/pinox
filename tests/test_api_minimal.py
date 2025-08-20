@@ -3,6 +3,7 @@ from httpx import AsyncClient
 from httpx import ASGITransport
 from api.main import app
 
+
 @pytest.mark.asyncio
 async def test_health():
     transport = ASGITransport(app=app)
@@ -11,19 +12,24 @@ async def test_health():
         assert resp.status_code == 200
         assert resp.json() == {"status": "ok"}
 
+
 @pytest.mark.asyncio
 async def test_jobs_flow(monkeypatch):
     # Force Redis mode with FakeRedis for predictable Dramatiq behavior
     import fakeredis
+
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
-    
+
     # Mock Redis client creation to use FakeRedis
     import redis
+
     original_from_url = redis.from_url
+
     def fake_redis_from_url(url, **kwargs):
         return fakeredis.FakeStrictRedis.from_url(url, **kwargs)
+
     monkeypatch.setattr(redis, "from_url", fake_redis_from_url)
-    
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. POST /jobs
@@ -33,8 +39,8 @@ async def test_jobs_flow(monkeypatch):
             "inputs": {
                 "xyz": "2\nH2\nH 0 0 0\nH 0 0 0.74\n",
                 "charge": 0,
-                "multiplicity": 1
-            }
+                "multiplicity": 1,
+            },
         }
         resp = await ac.post("/jobs", json=job_req)
         assert resp.status_code == 200

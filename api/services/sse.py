@@ -1,6 +1,7 @@
 import asyncio
 from starlette.responses import StreamingResponse
 
+
 async def sse_event_generator(log_iter, heartbeat=15):
     try:
         while True:
@@ -9,9 +10,10 @@ async def sse_event_generator(log_iter, heartbeat=15):
                 yield f"data: {line}\n\n"
             else:
                 await asyncio.sleep(heartbeat)
-                yield f": keep-alive\n\n"
+                yield ": keep-alive\n\n"
     except StopIteration:
         return
+
 
 def sse_response(log_iter, heartbeat=15):
     return StreamingResponse(

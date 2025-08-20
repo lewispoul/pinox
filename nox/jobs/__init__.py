@@ -12,4 +12,4 @@ from .manager import JobManager
 from .states import JobState
 from .storage import JobStorage
 
-__all__ = ['JobManager', 'JobState', 'JobStorage']
+__all__ = ["JobManager", "JobState", "JobStorage"]

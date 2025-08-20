@@ -32,10 +32,10 @@ class JobStorage:
         # Add timestamp metadata
         job_data["_metadata"] = {
             "last_updated": datetime.now(timezone.utc).isoformat(),
-            "storage_version": "1.0"
+            "storage_version": "1.0",
         }
 
-        with open(job_path, 'w', encoding='utf-8') as f:
+        with open(job_path, "w", encoding="utf-8") as f:
             json.dump(job_data, f, indent=2)
 
     def load_job(self, job_id: str) -> Optional[Dict[str, Any]]:
@@ -46,13 +46,14 @@ class JobStorage:
             return None
 
         try:
-            with open(job_path, 'r', encoding='utf-8') as f:
+            with open(job_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except (json.JSONDecodeError, OSError):
             return None
 
-    def update_job_state(self, job_id: str, new_state: JobState,
-                         message: str = "", progress: float = 0.0) -> bool:
+    def update_job_state(
+        self, job_id: str, new_state: JobState, message: str = "", progress: float = 0.0
+    ) -> bool:
         """Update job state and related metadata"""
         job_data = self.load_job(job_id)
         if job_data is None:
@@ -78,8 +79,7 @@ class JobStorage:
         self.save_job(job_id, job_data)
         return True
 
-    def list_jobs(self, state_filter: Optional[JobState] = None
-                  ) -> Dict[str, Dict]:
+    def list_jobs(self, state_filter: Optional[JobState] = None) -> Dict[str, Dict]:
         """List all jobs, optionally filtered by state"""
         jobs = {}
 

@@ -4,9 +4,8 @@ Version debug de l'API Nox v5 pour identifier les erreurs 500
 Désactive temporairement les middlewares de sécurité
 """
 import os
-import sys
 import traceback
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
 # Variables globales pour l'état du système de quotas
@@ -16,7 +15,6 @@ NOX_QUOTAS_ENABLED = os.getenv("NOX_QUOTAS_ENABLED", "0") == "1"
 if NOX_QUOTAS_ENABLED:
     from quotas.database import QuotaDatabase
     from quotas.routes import admin_router, user_router
-    from quotas.metrics import quota_metrics
 
     # Initialisation de la base de données des quotas
     quota_db = QuotaDatabase()
@@ -26,8 +24,9 @@ else:
 app = FastAPI(
     title="Nox API Debug",
     description="Version debug pour identifier les erreurs 500",
-    version="5.0.0-debug"
+    version="5.0.0-debug",
 )
+
 
 # Middleware d'erreur global pour capturer les stack traces
 @app.middleware("http")
@@ -40,15 +39,16 @@ async def debug_errors(request, call_next):
         print(f"Exception: {type(e).__name__}: {e}")
         print("Stack trace:")
         traceback.print_exc()
-        
+
         return JSONResponse(
             status_code=500,
             content={
-                "error": "Internal server error", 
+                "error": "Internal server error",
                 "debug": str(e),
-                "type": type(e).__name__
-            }
+                "type": type(e).__name__,
+            },
         )
+
 
 # Simulation d'extraction d'utilisateur simple
 def extract_user_id_from_token(token: str) -> str:
@@ -58,17 +58,19 @@ def extract_user_id_from_token(token: str) -> str:
         return "81dfa919-4604-4fdf-8038-4b862ee2a469"
     return token
 
+
 @app.get("/health")
 async def health():
     """Test simple de santé"""
     return {"status": "ok", "quotas": "enabled" if NOX_QUOTAS_ENABLED else "disabled"}
+
 
 @app.get("/debug/quotas/test")
 async def debug_quotas():
     """Test de connexion à la base des quotas"""
     if not quota_db:
         return {"error": "Quota DB not initialized"}
-    
+
     try:
         # Test de connexion
         conn = await quota_db.connect()
@@ -77,12 +79,13 @@ async def debug_quotas():
     except Exception as e:
         return {"error": f"Quota DB connection failed: {e}"}
 
+
 @app.get("/debug/user/test123")
 async def debug_user_test123():
     """Test de récupération de l'utilisateur test123"""
     if not quota_db:
         return {"error": "Quota DB not initialized"}
-    
+
     try:
         # Test get_user_by_oauth_id
         user = await quota_db.get_user_by_oauth_id("test123")
@@ -93,12 +96,13 @@ async def debug_user_test123():
     except Exception as e:
         return {"error": f"Error getting user: {e}"}
 
+
 @app.get("/debug/quotas/user/{user_id}")
 async def debug_user_quotas(user_id: str):
     """Test de récupération des quotas utilisateur"""
     if not quota_db:
         return {"error": "Quota DB not initialized"}
-    
+
     try:
         quotas = await quota_db.get_user_quotas(user_id)
         if quotas:
@@ -108,6 +112,7 @@ async def debug_user_quotas(user_id: str):
     except Exception as e:
         return {"error": f"Error getting quotas: {e}", "user_id": user_id}
 
+
 # Ajouter les routes de quotas si activées
 if NOX_QUOTAS_ENABLED and quota_db:
     print("📊 Adding quota routes for debug...")
@@ -116,9 +121,10 @@ if NOX_QUOTAS_ENABLED and quota_db:
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.getenv("NOX_PORT", "8083"))
-    
+
     print(f"🔍 Starting Nox API Debug on 127.0.0.1:{port}")
     print(f"   Quotas: {'✅ ENABLED' if NOX_QUOTAS_ENABLED else '❌ DISABLED'}")
-    
+
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="debug")

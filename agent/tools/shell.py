@@ -1,6 +1,7 @@
 # file: agent/tools/shell.py
 from __future__ import annotations
-import subprocess, shlex, os
+import subprocess
+
 
 def run(cmd: str, timeout: int = 600) -> int:
     print(f"$ {cmd}")

@@ -32,18 +32,13 @@ async def test_e2e_echo_local_mode(monkeypatch):
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         payload = {
             "kind": "echo",
-            "payload": {
-                "x": 42,
-                "msg": "hello"
-            }
+            "payload": {"x": 42, "msg": "hello"},
         }  # Adjusted to match SimpleJobRequest
         r = await c.post("/jobs", json=payload)
         assert r.status_code == 200
         job = r.json()
         job_id = job.get("job_id")
-        assert job.get("state") in {
-            "queued", "pending", "running", "done", "completed"
-        }
+        assert job.get("state") in {"queued", "pending", "running", "done", "completed"}
         final = await _poll_status(c, job_id, timeout_s=5.0)
         assert final and final.get("state") in {"done", "completed"}
         res = final.get("result") or final
@@ -66,8 +61,8 @@ async def test_e2e_xtb_with_cubes(monkeypatch):
                 "xyz": "2\nH2\nH 0 0 0\nH 0 0 0.74\n",
                 "charge": 0,
                 "multiplicity": 1,
-                "params": {"cubes": True}
-            }
+                "params": {"cubes": True},
+            },
         }
         r = await c.post("/jobs", json=job_req)
         assert r.status_code == 200

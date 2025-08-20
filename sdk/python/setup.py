@@ -7,6 +7,7 @@ v8.0.0 Developer Experience Enhancement
 from setuptools import setup, find_packages
 import os
 
+
 # Read README for long description
 def read_readme():
     try:
@@ -15,11 +16,14 @@ def read_readme():
     except FileNotFoundError:
         return "Advanced Python SDK for the Nox API platform with AI capabilities"
 
+
 # Read requirements
 def read_requirements():
     try:
         with open("requirements.txt", "r", encoding="utf-8") as fh:
-            return [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+            return [
+                line.strip() for line in fh if line.strip() and not line.startswith("#")
+            ]
     except FileNotFoundError:
         return [
             "aiohttp>=3.8.0",
@@ -30,6 +34,7 @@ def read_requirements():
             "python-dateutil>=2.8.2",
         ]
 
+
 # Get version
 def get_version():
     version_file = os.path.join(os.path.dirname(__file__), "nox_sdk", "__init__.py")
@@ -38,6 +43,7 @@ def get_version():
             if line.startswith("__version__"):
                 return line.split("=")[1].strip().strip('"')
     return "8.0.0"
+
 
 setup(
     name="nox-sdk",
@@ -106,8 +112,18 @@ setup(
     },
     include_package_data=True,
     keywords=[
-        "nox", "api", "sdk", "automation", "scripting", "ai", "security", 
-        "biometric", "authentication", "policy", "cloud", "distributed"
+        "nox",
+        "api",
+        "sdk",
+        "automation",
+        "scripting",
+        "ai",
+        "security",
+        "biometric",
+        "authentication",
+        "policy",
+        "cloud",
+        "distributed",
     ],
     zip_safe=False,
 )

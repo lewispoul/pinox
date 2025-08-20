@@ -1,8 +1,11 @@
-import json, shutil, pathlib
-from nox.parsers.xtb_json import parse_xtbout_text, XTBParseError
+import shutil
+import pathlib
+from nox.parsers.xtb_json import parse_xtbout_text
+
 
 class XTBNotAvailable(RuntimeError):
     pass
+
 
 def run_xtb(smiles: str | None = None, infile: str | None = None) -> dict:
     """

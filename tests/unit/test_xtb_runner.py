@@ -1,6 +1,5 @@
 import time
 
-import pytest
 
 from api.services.queue import submit_job, set_xtb_runner
 from api.services.jobs_store import get_store

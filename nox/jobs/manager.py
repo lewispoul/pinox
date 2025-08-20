@@ -34,7 +34,7 @@ class JobManager:
             "request": job_request,
             "result": None,
             "created_at": datetime.now(timezone.utc).isoformat(),
-            "updated_at": datetime.now(timezone.utc).isoformat()
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
         # Store in both memory (for immediate access) and persistent storage
@@ -58,8 +58,9 @@ class JobManager:
 
         return None
 
-    def update_job_state(self, job_id: str, new_state: JobState,
-                         message: str = "", progress: float = 0.0) -> bool:
+    def update_job_state(
+        self, job_id: str, new_state: JobState, message: str = "", progress: float = 0.0
+    ) -> bool:
         """Update job state with validation"""
         job_data = self.get_job(job_id)
         if not job_data:
@@ -105,8 +106,9 @@ class JobManager:
             job_id, JobState.FAILED, error_message, progress=0.0
         )
 
-    def list_jobs(self, state_filter: Optional[JobState] = None,
-                  limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def list_jobs(
+        self, state_filter: Optional[JobState] = None, limit: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
         """List jobs with optional filtering and limiting"""
         # Get jobs from storage (more complete than memory)
         jobs = self.storage.list_jobs(state_filter)
@@ -129,7 +131,7 @@ class JobManager:
         jobs_by_update = sorted(
             self._memory_jobs.items(),
             key=lambda x: x[1].get("updated_at", ""),
-            reverse=True
+            reverse=True,
         )
 
         # Keep only the most recent max_size jobs
@@ -141,8 +143,9 @@ class JobManager:
         stats = {"total": len(all_jobs)}
 
         for state in JobState:
-            count = sum(1 for job in all_jobs.values()
-                        if job.get("state") == state.value)
+            count = sum(
+                1 for job in all_jobs.values() if job.get("state") == state.value
+            )
             stats[state.value] = count
 
         return stats

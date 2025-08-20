@@ -21,7 +21,7 @@ async def create_job(request: Request):
     try:
         # Try to parse as raw dict first
         body = await request.json()
-        
+
         # Check if it looks like a simple job request (has 'kind' field)
         if "kind" in body and "payload" in body:
             # Simple job request
@@ -31,23 +31,19 @@ async def create_job(request: Request):
             if j is None:
                 raise HTTPException(500, "Failed to create job")
             return {"job_id": job_id, "state": j.state}
-        
+
         # Otherwise try to parse as XTB JobRequest
         try:
             xtb_req = JobRequest(**body)
-            payload = {
-                "job_request": xtb_req.model_dump_json()
-            }
+            payload = {"job_request": xtb_req.model_dump_json()}
             job_id = submit_job("xtb", payload)
-            
+
             return JobStatus(
-                job_id=job_id,
-                state="pending",
-                message="Job queued for processing"
+                job_id=job_id, state="pending", message="Job queued for processing"
             )
         except ValidationError:
             raise HTTPException(422, "Invalid job request format")
-            
+
     except Exception as e:
         raise HTTPException(400, f"Invalid request: {str(e)}")
 
@@ -81,19 +77,19 @@ def get_job_status(job_id: str):
     j = get_store().get(job_id)
     if not j:
         raise HTTPException(404, "Job not found")
-    
+
     # Map our job states to the expected states
     state_mapping = {
         "queued": "pending",
         "running": "running",
         "done": "completed",
-        "failed": "failed"
+        "failed": "failed",
     }
-    
+
     return JobStatus(
         job_id=job_id,
         state=state_mapping.get(j.state, j.state),
-        message=j.error or "Job processing"
+        message=j.error or "Job processing",
     )
 
 
@@ -103,16 +99,14 @@ def get_artifacts(job_id: str):
     j = get_store().get(job_id)
     if not j or j.state != "done" or not j.result:
         raise HTTPException(404, "Result not available")
-    
+
     rb = j.result
-    
+
     # Convert dict artifacts to Artifact objects for proper validation
     artifacts = []
     for art_dict in rb.get("artifacts", []):
         artifacts.append(Artifact(**art_dict))
-    
+
     return ResultBundle(
-        scalars=rb.get("scalars", {}),
-        series=rb.get("series", {}),
-        artifacts=artifacts
+        scalars=rb.get("scalars", {}), series=rb.get("series", {}), artifacts=artifacts
     )

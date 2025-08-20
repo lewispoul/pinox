@@ -200,37 +200,3 @@ jobs:
       with:
         sarif_file: 'trivy-results.sarif'
       continue-on-error: true
-
-  deploy-staging:
-    needs: [build, security-scan]
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: Deploy to staging
-      run: |
-        echo "Deploying to staging environment"
-        # Add your staging deployment logic here
-        # For example, update docker-compose.yml with new image tags
-        # and deploy to staging server via SSH
-    
-  deploy-production:
-    needs: [build, security-scan]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v') && github.event_name == 'push'
-    
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    
-    - name: Deploy to production
-      run: |
-        echo "Deploying to production environment"
-        # Add your production deployment logic here
-        # For example:
-        # 1. Update docker-compose.prod.yml with release tags
-        # 2. Run health checks
-        # 3. Deploy with zero-downtime strategy

@@ -62,7 +62,7 @@ EXPOSE 8082
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8082/api/v7/auth/health || exit 1
+    CMD curl -f http://localhost:8082/health || exit 1
 
 # Default command
-CMD ["python", "nox_api_v7_fixed.py"]
+CMD ["python", "-m", "uvicorn", "nox-api.api.nox_api:app", "--host", "0.0.0.0", "--port", "8082"]

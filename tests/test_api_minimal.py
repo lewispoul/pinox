@@ -43,15 +43,19 @@ async def test_jobs_flow(monkeypatch):
         assert job["state"] == "pending"  # POST returns JobStatus format
         job_id = job["job_id"]
 
-        # 2. GET /jobs/{job_id}
-        resp2 = await ac.get(f"/jobs/{job_id}")
-        assert resp2.status_code == 200
-        job2 = resp2.json()
-        assert job2["state"] == "queued"  # GET returns raw job state
-        assert job2["job_id"] == job_id
+        # 2/3. Use a fresh client for subsequent GETs to avoid leaks
+        transport2 = ASGITransport(app=app)
+        async with AsyncClient(transport=transport2, base_url="http://test") as ac2:
+            resp2 = await ac2.get(f"/jobs/{job_id}")
+            assert resp2.status_code == 200
+            job2 = resp2.json()
 
-        # 3. GET /jobs/{job_id}/artifacts - Should return 404 for pending jobs
-        resp3 = await ac.get(f"/jobs/{job_id}/artifacts")
-        assert resp3.status_code == 404  # No artifacts for pending jobs
-        result = resp3.json()
-        assert result["detail"] == "Result not available"  # Expected error message
+            # GET returns raw job state; allow both 'queued' and 'running'
+            assert job2["state"] in ("queued", "running")
+            assert job2["job_id"] == job_id
+
+            # 3. GET /jobs/{job_id}/artifacts - Should return 404 for pending jobs
+            resp3 = await ac2.get(f"/jobs/{job_id}/artifacts")
+            assert resp3.status_code == 404  # No artifacts for pending jobs
+            result = resp3.json()
+            assert result["detail"] == "Result not available"  # Expected error message

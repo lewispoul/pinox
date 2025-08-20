@@ -33,6 +33,10 @@ api-logs:
 test:
 	@PYTHONPATH=$(PYTHONPATH) pytest -q
 
+.PHONY: test-e2e
+test-e2e:
+	@PYTHONPATH=$(PYTHONPATH) pytest tests/e2e -q
+
 # ---- Legacy XTB targets (preserved) ----
 .PHONY: run worker redis help clean status logs install harden caddy-lan caddy-public nginx-public repair repair-v2 validate demo logs install-logs debug api-start api-stop api-logs _init
 

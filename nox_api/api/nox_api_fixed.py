@@ -6,10 +6,17 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-# Local imports
-from .metrics import metrics_response, update_sandbox_metrics
-from .middleware import MetricsMiddleware
-from .rate_limit_and_policy import RateLimitAndPolicyMiddleware
+# Solution rapide ChatGPT pour les imports
+from pathlib import Path
+import sys
+
+# ROOT = nox-api-src/
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from rate_limit_and_policy import RateLimitAndPolicyMiddleware
+from observability.metrics_chatgpt import metrics_response, update_sandbox_metrics
+from observability.middleware import MetricsMiddleware
 
 app = FastAPI(
     title="Nox API",
@@ -58,7 +65,7 @@ def metrics():
     if not NOX_METRICS_ENABLED:
         raise HTTPException(status_code=404, detail="metrics disabled")
     # mise à jour ponctuelle des métriques sandbox
-    update_sandbox_metrics(os.getenv("NOX_SANDBOX", "/home/nox/nox/sandbox"))
+    update_sandbox_metrics(str(SANDBOX))
     ct, payload = metrics_response()
     return Response(content=payload, media_type=ct)
 

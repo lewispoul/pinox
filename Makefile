@@ -137,5 +137,25 @@ demo:  ## Run legacy demo tests
 		echo "❌ Error: Legacy configuration not found"; \
 	fi
 
+# ---- Pinox targets ----
+up:
+	docker compose up -d --build
+
+down:
+	docker compose down -v
+
+logs:
+	docker compose logs -f --tail=100
+
+rebuild:
+	docker compose build --no-cache
+
+test:
+	docker compose run --rm gateway pytest -q && \
+	docker compose run --rm runner pytest -q
+
+autodoc:
+	python scripts/autodoc_progress.py
+
 # Default target
 .DEFAULT_GOAL := help

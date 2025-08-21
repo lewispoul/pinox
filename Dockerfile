@@ -2,17 +2,18 @@
 # Optimized for production with security hardening
 
 # ===== BUILD STAGE =====
-FROM python:3.11-alpine AS builder
+FROM python:3.11-slim AS builder
 
 # Install build dependencies
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     musl-dev \
     libffi-dev \
-    postgresql-dev \
-    rust \
+    libpq-dev \
+    rustc \
     cargo \
-    openssl-dev
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -29,17 +30,17 @@ RUN pip install --no-cache-dir --upgrade pip wheel setuptools && \
     pip install --no-cache-dir -r requirements.txt
 
 # ===== RUNTIME STAGE =====
-FROM python:3.11-alpine AS runtime
+FROM python:3.11-slim AS runtime
 
 # Install runtime dependencies only
-RUN apk add --no-cache \
-    postgresql-libs \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
     curl \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
-RUN addgroup -g 1001 -S noxapi && \
-    adduser -S -D -H -u 1001 -h /app -s /sbin/nologin -G noxapi -g noxapi noxapi
+RUN addgroup --gid 1001 noxapi && \
+    adduser --disabled-password --gecos "" --uid 1001 --gid 1001 --home /app --no-create-home noxapi
 
 # Set working directory and copy virtual environment
 WORKDIR /app

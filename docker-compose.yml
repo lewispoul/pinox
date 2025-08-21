@@ -131,6 +131,67 @@ services:
     depends_on:
       - prometheus
 
+  # ===== PINOX SERVICES =====
+  web:
+    build:
+      context: ./web
+      dockerfile: ../docker/Dockerfile.web
+    env_file: .env
+    ports: ["3000:3000"]
+    depends_on: [gateway]
+
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: ../../docker/Dockerfile.gateway
+    env_file: .env
+    ports: ["8080:8080"]
+    depends_on: [postgres, redis, minio]
+
+  runner:
+    build:
+      context: ./services/runner
+      dockerfile: ../../docker/Dockerfile.runner
+    env_file: .env
+    depends_on: [redis]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  mail_ingestor:
+    build:
+      context: ./services/mail_ingestor
+      dockerfile: ../../docker/Dockerfile.sidecar
+    env_file: .env
+    depends_on: [gateway]
+    restart: unless-stopped
+
+  inbox_watcher:
+    build:
+      context: ./services/inbox_watcher
+      dockerfile: ../../docker/Dockerfile.sidecar
+    env_file: .env
+    restart: unless-stopped
+    volumes:
+      - ./inbox:/watched:rw
+
+  result_notifier:
+    build:
+      context: ./services/result_notifier
+      dockerfile: ../../docker/Dockerfile.sidecar
+    env_file: .env
+    depends_on: [gateway, runner]
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASS}
+    ports: ["9000:9000","9001:9001"]
+    volumes:
+      - miniodata:/data
+
 # ===== NETWORKS =====
 networks:
   nox-network:
@@ -151,3 +212,5 @@ volumes:
   grafana_data:
     driver: local
     name: nox-grafana-data
+  dbdata: {}
+  miniodata: {}

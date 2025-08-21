@@ -1,0 +1,30 @@
+name: Deploy to Raspberry Pi
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.PI_HOST }}
+          username: ${{ secrets.PI_USER }}
+          key: ${{ secrets.PI_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euxo pipefail
+            cd ~/nox || git clone https://github.com/lewispoul/nox.git ~/nox
+            cd ~/nox
+            git fetch --all --prune
+            git reset --hard origin/main
+            docker build -t nox:pi .
+            docker stop nox || true
+            docker rm   nox || true
+            docker run -d --name nox -p 5000:5000 --restart unless-stopped nox:pi

@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 # Local imports
-from .metrics import metrics_response, update_sandbox_metrics
+from .metrics_chatgpt import metrics_response, update_sandbox_metrics
 from .middleware import MetricsMiddleware
 from .rate_limit_and_policy import RateLimitAndPolicyMiddleware
 

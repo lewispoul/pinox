@@ -43,6 +43,88 @@ pip install -r requirements.txt
 python -m uvicorn nox_api:app --host 0.0.0.0 --port 8080
 ```
 
+## 🤖 Run as Agent
+
+Turn Pinox into a self-hosted FastAPI agent service with clean import paths and reliable bootstrap scripts.
+
+### Bootstrap Setup
+
+Use the bootstrap script to automatically set up your environment:
+
+```bash
+# Run the bootstrap script
+./scripts/bootstrap_agent.sh
+```
+
+The bootstrap script will:
+- Create a virtual environment if missing
+- Install/update all dependencies including `python-multipart>=0.0.9`
+- Create a default `.env` file with configuration placeholders
+- Provide next steps and verification commands
+
+### Environment Variables
+
+Edit the `.env` file created by the bootstrap script:
+
+```bash
+# Pinox API Configuration
+OPENAI_API_KEY=""          # OpenAI API key for LLM integration
+NOX_API_TOKEN=""           # Bearer token for API authentication
+NOX_SANDBOX="/home/nox/nox/sandbox"  # Sandbox directory path
+NOX_TIMEOUT="20"           # Execution timeout in seconds
+NOX_METRICS_ENABLED="1"    # Enable/disable metrics collection
+```
+
+**Security Note**: Keep your `.env` file secure and never commit it to version control.
+
+### Systemd Service Setup
+
+For production deployment, install the systemd service:
+
+```bash
+# Copy the service file
+sudo cp deploy/systemd/pinox-api.service /etc/systemd/system/
+
+# Reload systemd and enable the service
+sudo systemctl daemon-reload
+sudo systemctl enable pinox-api
+
+# Start the service
+sudo systemctl restart pinox-api
+
+# Check status
+sudo systemctl status pinox-api
+```
+
+**Network Access**: Ensure port 8000 is reachable on your LAN. The service binds to `0.0.0.0:8000`.
+
+### Development Mode
+
+For local development, use the dev runner script:
+
+```bash
+# Start in development mode
+./scripts/dev_run.sh
+```
+
+### Verification Commands
+
+Test your installation:
+
+```bash
+# Health check
+curl -sS http://127.0.0.1:8000/health
+
+# API documentation
+curl -sS http://127.0.0.1:8000/docs | head -20
+
+# Access interactive docs
+open http://localhost:8000/docs
+```
+
+The canonical import path for the application is: `nox_api.api.nox_api:app`
+```
+
 ## 🔧 Running nox-api via uvicorn/systemd
 
 The nox-api service can be run directly with uvicorn or as a systemd service.

@@ -10,10 +10,12 @@ from pathlib import Path
 from agent.tools import fs, git, tests, codeedit
 from agent.planner import build_planner_prompt, parse_planner_json
 from agent.reporter import summarize_run
-from agent.util.shell import run as shell_run, have as shell_have
 
 # Service mode guard
-SERVICE_MODE = os.getenv("NOX_AGENT_MODE") == "service" or os.getenv("NOX_AGENT_SKIP_TESTS") == "1"
+SERVICE_MODE = (
+    os.getenv("NOX_AGENT_MODE") == "service"
+    or os.getenv("NOX_AGENT_SKIP_TESTS") == "1"
+)
 
 
 def apply_changes_via_files(changes, allowlist) -> str:
@@ -223,7 +225,7 @@ def run_once(dry_run: bool = False, no_pr: bool = False) -> bool:
         return True
 
     # Real run:
-    branch = f"{cfg.get('branch_prefix','agent/')}{task.get('id','task')}"
+    branch = f"{cfg.get('branch_prefix', 'agent/')}{task.get('id', 'task')}"
     git.create_branch(branch)
 
     # If we used 'changes', the index is already staged. If we only had 'patch' and no 'changes',

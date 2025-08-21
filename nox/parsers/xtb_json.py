@@ -2,10 +2,8 @@ import json
 
 REQUIRED = ("energy", "homo_lumo_gap_ev", "dipole_debye")
 
-
 class XTBParseError(ValueError):
     pass
-
 
 def parse_xtbout_text(text: str) -> dict:
     """Parse xtbout.json text and normalize schema to {energy, gap, dipole}."""

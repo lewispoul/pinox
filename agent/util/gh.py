@@ -2,8 +2,8 @@ from agent.util.shell import run, have
 
 
 def write_pr_body(text: str, path: str = "/tmp/pr_body.md"):
-    heredoc = f"cat > {path} <<'EOF'\n{text}\nEOF"
-    run(heredoc, check=True)
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(text)
 
 
 def create_pr(title: str, body: str):

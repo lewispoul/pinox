@@ -2,7 +2,6 @@ import json
 
 REQUIRED = ("energy", "homo_lumo_gap_ev", "dipole_debye")
 
-
 class XTBParseError(ValueError):
     pass
 

@@ -24,10 +24,20 @@ app.add_middleware(MetricsMiddleware)
 app.add_middleware(RateLimitAndPolicyMiddleware)
 
 NOX_TOKEN = os.getenv("NOX_API_TOKEN", "").strip()
-SANDBOX = pathlib.Path(os.getenv("NOX_SANDBOX", "/home/nox/nox/sandbox")).resolve()
+SANDBOX = pathlib.Path(os.getenv("NOX_SANDBOX", "/tmp/nox_sandbox")).resolve()
 TIMEOUT_SEC = int(os.getenv("NOX_TIMEOUT", "20"))
 
-SANDBOX.mkdir(parents=True, exist_ok=True)
+try:
+    SANDBOX.mkdir(parents=True, exist_ok=True)
+except PermissionError:
+    # Fallback to a temporary directory if we don't have permissions
+    import tempfile
+    SANDBOX = pathlib.Path(tempfile.mkdtemp(prefix="nox_sandbox_"))
+    print(f"Warning: Using temporary sandbox at {SANDBOX}")
+except Exception as e:
+    print(f"Warning: Could not create sandbox: {e}")
+    # Still set SANDBOX to avoid import errors
+    SANDBOX = pathlib.Path("/tmp")
 
 
 def check_auth(auth: str | None):

@@ -43,6 +43,73 @@ pip install -r requirements.txt
 python -m uvicorn nox_api:app --host 0.0.0.0 --port 8080
 ```
 
+## 🔧 Running nox-api via uvicorn/systemd
+
+The nox-api service can be run directly with uvicorn or as a systemd service.
+
+### Direct uvicorn execution
+
+```bash
+# Install dependencies
+pip install fastapi uvicorn python-multipart prometheus_client
+
+# Run the API service
+uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000
+
+# Or with custom configuration
+NOX_API_TOKEN="your-token" \
+NOX_SANDBOX="/tmp/nox_sandbox" \
+NOX_METRICS_ENABLED="1" \
+uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### systemd service configuration
+
+Create a systemd unit file at `/etc/systemd/system/pinox-api.service`:
+
+```ini
+[Unit]
+Description=Pinox API Service
+After=network.target
+
+[Service]
+Type=exec
+User=nox
+Group=nox
+WorkingDirectory=/path/to/pinox
+Environment=NOX_API_TOKEN=your-secure-token
+Environment=NOX_SANDBOX=/home/nox/nox/sandbox
+Environment=NOX_METRICS_ENABLED=1
+ExecStart=/usr/local/bin/uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Enable and start the service
+sudo systemctl daemon-reload
+sudo systemctl enable pinox-api
+sudo systemctl start pinox-api
+
+# Check service status
+sudo systemctl status pinox-api
+```
+
+### Health Check and API Documentation
+
+- **Health endpoint**: `GET /health` - Returns service status and sandbox path
+- **API documentation**: `GET /docs` - Interactive Swagger UI
+- **Metrics endpoint**: `GET /metrics` - Prometheus metrics (if enabled)
+
+Example health check:
+```bash
+curl http://localhost:8000/health
+# {"status":"ok","sandbox":"/tmp/nox_sandbox"}
+```
+
 ## 🎯 Architecture
 
 - **`/api`** - FastAPI application with REST endpoints

@@ -1,6 +1,5 @@
 # Docker Compose - Production Configuration
 # Nox API v7.0.0 with PostgreSQL, Redis, and monitoring
-version: '3.8'
 
 services:
   # ===== NOX API SERVICE =====

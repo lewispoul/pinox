@@ -18,7 +18,7 @@ def parse_xtbout_text(text: str) -> dict:
         raise XTBParseError(f"missing field(s): {', '.join(missing)}")
 
     return {
-        "energy": float(data["energy"]),  # Hartree (Eh)
+        "energy": float(data["energy"],  # Hartree (Eh)
         "gap": float(data["homo_lumo_gap_ev"]),  # eV
         "dipole": float(data["dipole_debye"]),  # Debye
     }

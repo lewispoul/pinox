@@ -1,0 +1,21 @@
+[Unit]
+Description=Nox Agent
+After=network.target
+
+[Service]
+User=lppou
+Group=lppou
+WorkingDirectory=/home/lppou/pinox
+# Use the env python directly to avoid relying on interactive shell sourcing
+# Load env files if present (dash prefix makes them optional)
+EnvironmentFile=-/home/lppou/pinox/deploy/.env
+EnvironmentFile=-/home/lppou/pinox/.env
+Environment=NOX_AGENT_ALLOW_ON_MAIN=1
+Environment=NOX_AGENT_ALLOW_DIRTY=1
+ExecStart=/home/lppou/miniconda3/envs/nox-env/bin/python -m agent.executor --once
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

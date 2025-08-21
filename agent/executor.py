@@ -73,8 +73,10 @@ def preflight_checks() -> None:
         current_branch = subprocess.check_output(
             "git rev-parse --abbrev-ref HEAD", shell=True, text=True
         ).strip()
-        if current_branch == "main":
-            print("ERROR: Agent cannot run on main branch. Switch to a feature branch.")
+        # Allow overriding the main-branch safeguard using an env var for controlled deployments
+        allow_on_main = os.getenv("NOX_AGENT_ALLOW_ON_MAIN", "0")
+        if current_branch == "main" and allow_on_main != "1":
+            print("ERROR: Agent cannot run on main branch. Switch to a feature branch or set NOX_AGENT_ALLOW_ON_MAIN=1 to override.")
             sys.exit(1)
     except subprocess.CalledProcessError:
         print("ERROR: Failed to check current branch")
@@ -85,9 +87,10 @@ def preflight_checks() -> None:
         status = subprocess.check_output(
             "git status --porcelain", shell=True, text=True
         ).strip()
-        if status:
+        allow_dirty = os.getenv("NOX_AGENT_ALLOW_DIRTY", "0")
+        if status and allow_dirty != "1":
             print(
-                "ERROR: Working tree is dirty. Commit or stash changes before running agent."
+                "ERROR: Working tree is dirty. Commit or stash changes before running agent or set NOX_AGENT_ALLOW_DIRTY=1 to override."
             )
             sys.exit(1)
     except subprocess.CalledProcessError:

@@ -32,7 +32,7 @@ services:
       - API_HOST=0.0.0.0
       - API_PORT=8082
       - ENVIRONMENT=production
-      
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
       # Redis configuration
       - REDIS_URL=redis://redis:6379/0
       

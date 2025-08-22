@@ -54,7 +54,9 @@ def check_auth(auth: str | None):
 
 
 def safe_join(relpath: str) -> pathlib.Path:
-    p = (SANDBOX / relpath.lstrip("/")).resolve()
+    # Remove leading slashes to prevent absolute path escapes
+    cleaned_path = relpath.lstrip("/")
+    p = (SANDBOX / cleaned_path).resolve()
     if SANDBOX not in p.parents and p != SANDBOX:
         raise HTTPException(status_code=400, detail="Path escapes sandbox")
     return p

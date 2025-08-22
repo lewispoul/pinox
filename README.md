@@ -32,6 +32,7 @@ All documentation has been comprehensively organized in the [`docs/`](./docs/) d
 ## 🛠️ Quick Setup
 
 ```bash
+```bash
 # Clone the repository
 git clone https://github.com/lewispoul/nox.git
 cd nox
@@ -42,6 +43,25 @@ pip install -r requirements.txt
 # Run the API
 python -m uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000
 ```
+
+### 🚀 Agent GUI Quickstart (30 seconds)
+
+For the full interactive experience:
+
+```bash
+# Start with GUI enabled (recommended)
+make dev
+# or: uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000 --reload
+
+# Open browser to: http://localhost:8000/gui
+```
+
+**🎯 Instant Agent Features:**
+- **Interactive Terminal** - Safe command execution in sandbox
+- **AI Chat Interface** - Code assistance (set OPENAI_API_KEY)  
+- **File Management** - Drag-drop uploads, instant browser
+- **Test Runner** - One-click pytest with live results
+- **API Builder** - Test all endpoints interactively
 
 ## 🎯 Agent GUI Interface
 
@@ -214,7 +234,108 @@ curl -sS -X POST http://127.0.0.1:8000/run_py \
   -d '{"code":"print(\"Hello, authenticated world!\")"}'
 ```
 
-## 🔧 Environment Configuration
+## 📸 Screenshots
+
+### Agent GUI Interface
+
+The Pinox Agent GUI provides a comprehensive web-based interface for development and testing:
+
+**Main Interface Layout:**
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Pinox Agent GUI                            │
+├─────────────────┬───────────────────────────────────────────────┤
+│  📁 File        │  🖥️ Terminal | 💬 Chat | 🧪 Tests | 🔧 API     │
+│   Explorer      │                                               │
+│                 │  ┌─────────────────────────────────────────┐  │
+│ ┌─────────────┐ │  │ $ echo "Hello from terminal"           │  │
+│ │ Upload Area │ │  │ Hello from terminal                     │  │
+│ │ (Drag&Drop) │ │  │ $ ls -la                                │  │
+│ └─────────────┘ │  │ total 8                                 │  │
+│                 │  │ drwx------ 2 user user 4096 Aug 22     │  │
+│ File List:      │  │ -rw-r--r-- 1 user user   13 Aug 22     │  │
+│ • script.py     │  │                                         │  │
+│ • results.txt   │  │ $ |                                     │  │
+│ • logs/         │  └─────────────────────────────────────────┘  │
+│                 │                                               │
+└─────────────────┴───────────────────────────────────────────────┘
+```
+
+**Key Visual Features:**
+- **Responsive 2-column layout** with file explorer on left, tabbed interface on right
+- **Modern styling** using Tailwind CSS with professional color scheme
+- **Interactive terminal** with green-on-black retro styling 
+- **Real-time file management** with drag-drop upload zones
+- **Tabbed interface** for easy navigation between tools
+- **Keyboard shortcuts** prominently displayed for power users
+
+**Tab Interfaces:**
+
+1. **🖥️ Terminal Tab:**
+   - Black background with green text (classic terminal aesthetic)
+   - Real-time command execution via WebSocket
+   - Command history and scrollable output
+   - Safe command filtering indicators
+
+2. **💬 Chat Tab:**
+   - Clean chat bubble interface
+   - User messages (blue) vs AI responses (gray)
+   - Configuration status indicators
+   - Ctrl+Enter quick send functionality
+
+3. **🧪 Test Runner Tab:**
+   - Live test output streaming
+   - Green/red status indicators
+   - One-click "Run Tests" button
+   - Progress indicators and final summaries
+
+4. **🔧 Request Builder Tab:**
+   - HTTP method selector dropdown
+   - URL path input field
+   - JSON body editor with syntax highlighting
+   - Response viewer with status code colors
+
+**Mobile Responsive Design:**
+- Stacked layout on mobile devices
+- Touch-optimized buttons and controls
+- Swipe gestures for tab navigation
+- Collapsible file explorer on small screens
+
+### Development Screenshots
+
+*(Screenshots would be taken here when the server is running)*
+
+**To generate screenshots:**
+```bash
+# Start the server
+make dev
+
+# Open browser to http://localhost:8000/gui
+# Take screenshots of each tab interface
+# Show file upload in action
+# Demonstrate terminal commands
+# Show chat interface with AI responses
+```
+
+### Integration Examples
+
+**File Management in Action:**
+- Drag files from desktop → immediate upload to sandbox
+- Click file names → instant content preview in new tab
+- Delete confirmations with one-click cleanup
+- Real-time file list updates
+
+**Terminal Capabilities:**
+- Safe command execution (`echo`, `ls`, `cat`, `python`)
+- Blocked dangerous commands (`rm`, `sudo`, `kill`)
+- Real-time output streaming
+- HTTP fallback when WebSocket unavailable
+
+**AI Chat Integration:**
+- Context-aware conversations about uploaded code
+- Error analysis and debugging suggestions  
+- Code review and optimization recommendations
+- Integration with file contents for contextual help
 
 ```bash
 # Core settings

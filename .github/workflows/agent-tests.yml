@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.12]
+        python-version: [3.11]
 
     steps:
     - uses: actions/checkout@v4
@@ -24,8 +24,9 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r dev-requirements.txt
+        # Install with retries and timeout settings for network reliability
+        pip install --timeout=60 --retries=3 -r requirements.txt
+        pip install --timeout=60 --retries=3 -r dev-requirements.txt
 
     - name: Run tests
       run: |
@@ -35,9 +36,31 @@ jobs:
 
     - name: Test API server startup
       run: |
-        timeout 10s uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000 &
-        sleep 5
-        curl -f http://localhost:8000/health || exit 1
-        curl -f http://localhost:8000/gui || exit 1
+        echo "Starting uvicorn server..."
+        timeout 15s uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000 &
+        SERVER_PID=$!
+        echo "Server PID: $SERVER_PID"
+        
+        # Wait for server to be ready
+        echo "Waiting for server to start..."
+        for i in {1..10}; do
+          if curl -f http://localhost:8000/health > /dev/null 2>&1; then
+            echo "Server is ready!"
+            break
+          fi
+          echo "Attempt $i/10: Server not ready yet, waiting..."
+          sleep 1
+        done
+        
+        # Test the endpoints
+        echo "Testing /health endpoint..."
+        curl -f http://localhost:8000/health || { echo "Health check failed"; kill $SERVER_PID 2>/dev/null; exit 1; }
+        
+        echo "Testing /gui endpoint..."
+        curl -f http://localhost:8000/gui || { echo "GUI check failed"; kill $SERVER_PID 2>/dev/null; exit 1; }
+        
+        echo "All tests passed!"
+        # Clean up
+        kill $SERVER_PID 2>/dev/null || true
       env:
         NOX_METRICS_ENABLED: "1"

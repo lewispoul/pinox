@@ -6,10 +6,20 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Header, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-# Local imports
-from .metrics import metrics_response, update_sandbox_metrics
-from .middleware import MetricsMiddleware
-from .rate_limit_and_policy import RateLimitAndPolicyMiddleware
+# Import du middleware de sécurité Phase 2.1
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from rate_limit_and_policy import RateLimitAndPolicyMiddleware
+
+# Import des métriques Phase 2.2 - approche ChatGPT
+sys.path.append(
+    os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "observability"
+    )
+)
+from metrics_chatgpt import metrics_response, update_sandbox_metrics
+from middleware import MetricsMiddleware
 
 app = FastAPI(
     title="Nox API",

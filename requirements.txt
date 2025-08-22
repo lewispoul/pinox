@@ -39,3 +39,12 @@ python-dateutil==2.9.0
 # Development and testing (optional)
 pytest==8.3.4
 pytest-asyncio==0.25.0
+
+# WebSocket and SSE support
+websockets==13.0
+# For email sending  
+aiosmtplib==3.0.2
+# For OpenAI chat
+openai==1.57.0
+# Server-sent events
+starlette-sse==0.1.2

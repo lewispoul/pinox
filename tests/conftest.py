@@ -19,6 +19,10 @@ def test_env(sandbox_dir, monkeypatch):
     # Keep a safe timeout
     monkeypatch.setenv("NOX_TIMEOUT", "20")
     # NOTE: Do NOT set NOX_API_TOKEN here; auth tests control it explicitly.
+    # Ensure clean environment
+    monkeypatch.delenv("NOX_API_TOKEN", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("SMTP_HOST", raising=False)
 
 # Import the FastAPI app once for the session
 @pytest.fixture(scope="session")

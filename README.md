@@ -40,10 +40,198 @@ cd nox
 pip install -r requirements.txt
 
 # Run the API
-python -m uvicorn nox_api:app --host 0.0.0.0 --port 8080
+python -m uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000
 ```
 
-## 🤖 Run as Agent
+## 🎯 Agent GUI Interface
+
+Pinox now includes a comprehensive web-based GUI for agent development and testing.
+
+### Starting the GUI
+
+```bash
+# Development mode with auto-reload
+source .venv/bin/activate && uvicorn nox_api.api.nox_api:app --host 0.0.0.0 --port 8000 --reload
+
+# Or using Makefile
+make dev
+```
+
+Visit the GUI at: **http://localhost:8000/gui**
+
+### GUI Features
+
+**🖥️ Interactive Terminal**
+- Sandboxed command execution via WebSocket
+- Real-time output streaming
+- Safe command filtering (forbidden: `rm`, `sudo`, `kill`, etc.)
+
+**💬 AI Chat Interface**
+- Direct integration with OpenAI API
+- Contextual conversations about your code
+- Requires `OPENAI_API_KEY` environment variable
+
+**📁 File Explorer**
+- Drag-and-drop file uploads
+- File viewing and deletion
+- Integrated with existing `/put`, `/list`, `/cat`, `/delete` endpoints
+
+**🧪 Test Runner**  
+- One-click pytest execution
+- Live output streaming
+- Support for custom test paths and arguments
+
+**🔧 Request Builder**
+- Interactive API testing interface
+- JSON request/response formatting
+- Auto-filled authentication headers
+
+### Keyboard Shortcuts
+
+- **Ctrl+Enter** in Chat: Send message
+- **Ctrl+R** in Test Runner: Run tests  
+- **Ctrl+U** anywhere: Focus file upload
+
+## 📧 Email Integration
+
+Send emails with attachments from the sandboxed environment:
+
+```bash
+# Configure SMTP settings
+export SMTP_HOST=smtp.gmail.com
+export SMTP_PORT=587
+export SMTP_USERNAME=your-email@gmail.com
+export SMTP_PASSWORD=your-app-password
+export SMTP_USE_TLS=1
+export SMTP_FROM=your-email@gmail.com
+
+# Send email via API
+curl -X POST http://localhost:8000/mail \
+  -H "Content-Type: application/json" \
+  -d '{
+    "to": "recipient@example.com",
+    "subject": "Test from Pinox",
+    "body": "Hello from the sandbox!",
+    "attachments": ["results.txt", "logs/output.log"]
+  }'
+```
+
+## 🧪 Testing
+
+Run the comprehensive test suite:
+
+```bash
+# Run all tests
+pytest -q
+
+# Run specific test categories
+pytest tests/test_chat.py -v
+pytest tests/test_run_tests.py -v  
+pytest tests/test_mail.py -v
+pytest tests/test_file_operations.py -v
+
+# Run with authentication tests
+export NOX_API_TOKEN=test-token-123
+pytest tests/test_*auth* -v
+```
+
+## 📋 API Reference
+
+### Core Endpoints
+
+```bash
+# Health check
+curl -sS http://127.0.0.1:8000/health
+
+# Execute Python code
+curl -sS -X POST http://127.0.0.1:8000/run_py \
+  -H 'Content-Type: application/json' \
+  -d '{"code":"print(2+2)"}'
+
+# Execute shell command
+curl -sS -X POST http://127.0.0.1:8000/run_sh \
+  -H 'Content-Type: application/json' \
+  -d '{"cmd":"echo ok"}'
+
+# Upload file
+curl -X POST http://127.0.0.1:8000/put \
+  -F "f=@example.txt" \
+  -F "path=uploaded_file.txt"
+
+# List files
+curl -sS http://127.0.0.1:8000/list?path=
+
+# Read file content
+curl -sS http://127.0.0.1:8000/cat?path=uploaded_file.txt
+
+# Delete file
+curl -X DELETE http://127.0.0.1:8000/delete?path=uploaded_file.txt
+```
+
+### Agent Features
+
+```bash
+# Chat with AI assistant
+curl -sS -X POST http://127.0.0.1:8000/chat \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "Help me debug this Python code"}
+    ]
+  }'
+
+# Run tests
+curl -sS -X POST http://127.0.0.1:8000/run_tests \
+  -H 'Content-Type: application/json' \
+  -d '{"test_path": "tests/", "args": ["-v"]}'
+
+# Send email
+curl -sS -X POST http://127.0.0.1:8000/mail \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "to": "me@example.com",
+    "subject": "Results from Pinox",
+    "body": "Please find the analysis results attached.",
+    "attachments": ["results.csv", "plots/analysis.png"]
+  }'
+
+# Get metrics (Prometheus format)
+curl -sS http://127.0.0.1:8000/metrics
+```
+
+### With Authentication
+
+When `NOX_API_TOKEN` is set, include the Bearer token:
+
+```bash
+# Set your token
+export NOX_API_TOKEN=your-secret-token
+
+# Authenticated request
+curl -sS -X POST http://127.0.0.1:8000/run_py \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer your-secret-token' \
+  -d '{"code":"print(\"Hello, authenticated world!\")"}'
+```
+
+## 🔧 Environment Configuration
+
+```bash
+# Core settings
+export NOX_SANDBOX=/tmp/nox_sandbox     # Sandbox directory
+export NOX_TIMEOUT=30                   # Command timeout in seconds
+export NOX_API_TOKEN=your-secret-token  # Optional Bearer token auth
+export NOX_METRICS_ENABLED=1           # Enable Prometheus metrics
+
+# GUI and AI features
+export OPENAI_API_KEY=sk-...            # OpenAI API key for chat
+export SMTP_HOST=smtp.gmail.com         # SMTP server for email
+export SMTP_PORT=587                    # SMTP port
+export SMTP_USERNAME=user@example.com   # SMTP username
+export SMTP_PASSWORD=app-password       # SMTP password
+export SMTP_USE_TLS=1                   # Enable TLS (1) or disable (0)
+export SMTP_FROM=sender@example.com     # From email address
+```
 
 Turn Pinox into a self-hosted FastAPI agent service with clean import paths and reliable bootstrap scripts.
 

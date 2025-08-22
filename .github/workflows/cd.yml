@@ -3,7 +3,7 @@
 
 name: CD - Continuous Deployment
 
-on:
+"on":
   workflow_run:
     workflows: ["Docker Build and Deploy"]
     types:

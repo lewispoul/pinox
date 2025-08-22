@@ -1,6 +1,6 @@
 name: Docker Build and Deploy
 
-on:
+"on":
   push:
     branches: [ main, develop ]
     tags: [ 'v*' ]

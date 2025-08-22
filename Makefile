@@ -1,7 +1,7 @@
 # ---- NOX API XTB Dev Workflow ----
 PYTHONPATH := $(shell pwd)
-APP := api.main:app
-HOST := 127.0.0.1
+APP := nox_api.api.nox_api:app
+HOST := 0.0.0.0
 PORT := 8000
 
 LOG_DIR := .logs
@@ -12,10 +12,24 @@ API_PID := $(RUN_DIR)/api.pid
 _init:
 	@mkdir -p $(LOG_DIR) $(RUN_DIR)
 
-# ---- API (new dev workflow) ----
+# ---- Development shortcuts ----
+dev: _init
+	@echo "Starting Pinox Agent GUI in development mode..."
+	uvicorn nox_api.api.nox_api:app --reload --host $(HOST) --port $(PORT)
+
+test:
+	pytest -q
+
+test-verbose:
+	pytest -v
+
+build-web:
+	@echo "Web build not yet implemented (placeholder)"
+
+# ---- API (existing workflow) ----
 api-start: _init
 	@echo "Starting API on $(HOST):$(PORT)…"
-	@(PYTHONPATH=$(PYTHONPATH) uvicorn $(APP) --host $(HOST) --port $(PORT) --reload \
+	@(PYTHONPATH=$(PYTHONPATH) uvicorn nox_api.api.nox_api:app --host $(HOST) --port $(PORT) --reload \
 		> $(LOG_DIR)/api.log 2>&1 & echo $$! > $(API_PID))
 	@echo "API PID: $$(cat $(API_PID))  (logs: $(LOG_DIR)/api.log)"
 

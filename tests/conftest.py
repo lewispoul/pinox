@@ -23,7 +23,6 @@ def test_env(sandbox_dir):
 
     yield
     mp.undo()
-=======
 import pathlib
 import pytest
 from httpx import AsyncClient

@@ -1,3 +1,4 @@
+from fastapi.openapi.utils import get_openapi
 import os
 import subprocess
 import shlex
@@ -514,3 +515,35 @@ if __name__ == "__main__":
     host = os.getenv("NOX_BIND_ADDR", "127.0.0.1")
     port = int(os.getenv("NOX_PORT", "8080"))
     uvicorn.run(app, host=host, port=port)
+def custom_openapi():
+    """
+    Ajoute un schéma de sécurité Bearer à l'OpenAPI pour que Swagger UI
+    affiche le cadenas et attache automatiquement le header Authorization.
+    """
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description="API sécurisée d'exécution de code - Phase 2.2 avec Observabilité",
+        routes=app.routes,
+    )
+
+    # Déclare le schéma Bearer (JWT-like)
+    openapi_schema.setdefault("components", {}).setdefault("securitySchemes", {})
+    openapi_schema["components"]["securitySchemes"]["BearerAuth"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+    }
+
+    # Exige le Bearer par défaut (tu gardes quand même ta logique check_auth
+    # qui n'applique l'auth que si NOX_API_TOKEN est non vide)
+    openapi_schema["security"] = [{"BearerAuth": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+# Active le schéma custom pour FastAPI/Swagger
+app.openapi = custom_openapi

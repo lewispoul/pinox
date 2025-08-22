@@ -1,5 +1,4 @@
 # tests/conftest.py
-<<<<<<< HEAD
 import os
 import pytest
 from _pytest.monkeypatch import MonkeyPatch
@@ -59,4 +58,4 @@ async def client(app):
 @pytest.fixture
 def sandbox_path(sandbox_dir):
     return pathlib.Path(sandbox_dir)
->>>>>>> e4423fa58fca59d2037c22d162c01ed01b58237b
+

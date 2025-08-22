@@ -2,8 +2,8 @@
 # Testing, linting, and development tools
 
 # Testing framework
-pytest==8.3.2
-pytest-asyncio==0.24.0
+pytest==8.3.4
+pytest-asyncio==0.25.0
 pytest-cov==5.0.0
 httpx==0.28.1
 fakeredis==2.31.0
@@ -24,4 +24,4 @@ pyyaml==6.0.2
 rich==13.8.0
 
 # AI integration for agent
-openai==1.42.0
+openai==1.57.0

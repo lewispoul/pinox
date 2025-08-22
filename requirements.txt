@@ -46,5 +46,5 @@ websockets==13.0
 aiosmtplib==3.0.2
 # For OpenAI chat
 openai==1.57.0
-# Server-sent events
-starlette-sse==0.1.2
+# Server-sent events  
+starlette-sse==0.0.1
